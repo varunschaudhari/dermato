@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+.env
+dataset/
+
+# Backend
+backend/uploads/*
+!backend/uploads/.gitkeep
+.pytest_cache/
+backend/runs/
+*.db
+*.log
+
+# ML model weights (large binaries; not currently loaded by the app code)
+*.pt
+*.pth
+backend/models/
+
+# Node
+node_modules/
+dist/
+
+# React Native / Android build tools
+.gradle/
+*.hprof
+local.properties
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Local dev toolchains (downloaded SDKs/binaries, not project source)
+tools/

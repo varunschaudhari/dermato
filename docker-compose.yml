@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/uploads:/app/uploads
+    environment:
+      # MongoDB runs on the host (not in this compose file) — host.docker.internal
+      # reaches it from inside the container. Needs `extra_hosts` below on Linux.
+      - MONGO_URI=mongodb://host.docker.internal:27017
+      - MONGO_DB_NAME=dermato
+      - CORS_ORIGINS=http://localhost:3000
+      - FRONTEND_URL=http://localhost:3000
+      # Override these in a .env file for anything beyond local dev
+      - SECRET_KEY=${SECRET_KEY:-dev-insecure-secret-change-me}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@dermato.local}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    # Production build (nginx serving the compiled bundle) — matches what
+    # actually deploys. For local iteration, run `npm run dev` directly
+    # instead of docker-compose; it's faster and has hot reload.
+    build: ./frontend
+    ports:
+      - "3010:8080"
+    environment:
+      - BACKEND_ORIGIN=http://backend:8000
+    depends_on:
+      - backend

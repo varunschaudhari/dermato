@@ -1,0 +1,24 @@
+# Training dependencies (separate from backend/requirements.txt)
+# Install: pip install -r training/requirements_training.txt
+
+# YOLO
+ultralytics==8.2.48
+
+# EfficientNet + other pretrained models
+timm==1.0.3
+
+# PyTorch — install GPU version from pytorch.org if you have CUDA
+# CPU-only (slower training):
+torch==2.3.1
+torchvision==0.18.1
+
+# Data & evaluation
+scikit-learn==1.5.0
+numpy==1.26.4
+pandas==2.2.2
+Pillow==10.3.0
+opencv-python==4.10.0.82
+
+# Visualization
+matplotlib==3.9.0
+seaborn==0.13.2

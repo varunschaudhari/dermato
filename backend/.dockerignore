@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+dermato.db
+uploads/*
+!uploads/.gitkeep
+.env
+.pytest_cache
+
+# training/inference.py is imported at runtime by app/api/routes/analysis.py — keep the
+# scripts, just drop the notebook/dataset-adjacent stuff that isn't needed to serve requests
+training/colab/
+training/requirements_training.txt

@@ -1,0 +1,26 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+pymongo==4.8.0
+dnspython==2.6.1  # required by pymongo to resolve mongodb+srv:// URIs (e.g. MongoDB Atlas)
+pydantic-settings==2.3.0
+passlib==1.7.4
+bcrypt==4.0.1  # passlib 1.7.4 predates bcrypt's 4.1+ API changes; pin or hashing raises AttributeError
+python-jose[cryptography]==3.3.0
+slowapi==0.1.9
+opencv-python==4.10.0.82
+numpy==1.26.4
+scikit-image==0.23.2
+pandas==2.2.2
+openpyxl==3.1.4
+
+# ML inference (backend/training/inference.py, loaded by app/api/routes/analysis.py)
+# CPU wheels: pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu
+torch==2.3.1
+torchvision==0.18.1
+ultralytics==8.2.48
+timm==1.0.3
+
+# Tests
+pytest==8.2.2
+httpx==0.27.0

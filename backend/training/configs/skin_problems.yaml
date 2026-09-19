@@ -1,0 +1,18 @@
+path: C:/Users/VarunChaudhari/my-projects/dermato/dataset/Face Skin Problems.v1i.yolo26
+
+train: train/images
+val:   valid/images
+test:  test/images
+
+nc: 10
+names:
+  0: Acne
+  1: Blackheads
+  2: Dark-Spots
+  3: Dry-Skin
+  4: Enlarged-Pores
+  5: Eyebags
+  6: Oily-Skin
+  7: Skin-Redness
+  8: Whiteheads
+  9: Wrinkles

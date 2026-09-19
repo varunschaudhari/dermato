@@ -1,0 +1,14 @@
+path: C:/Users/VarunChaudhari/my-projects/dermato/dataset/Acne.v21i.yolo26
+
+train: train/images
+val:   valid/images
+test:  test/images
+
+nc: 6
+names:
+  0: blackheads
+  1: dark spot
+  2: nodules
+  3: papules
+  4: pustules
+  5: whiteheads
