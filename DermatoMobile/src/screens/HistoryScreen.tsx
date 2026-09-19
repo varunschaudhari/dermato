@@ -56,6 +56,12 @@ export default function HistoryScreen() {
                 </View>
               </View>
             </View>
+            {item.doctor_note && (
+              <View style={styles.noteBox}>
+                <Text style={styles.noteLabel}>Doctor's note</Text>
+                <Text style={styles.noteText}>{item.doctor_note}</Text>
+              </View>
+            )}
           </View>
         )}
       />
@@ -74,4 +80,7 @@ const styles = StyleSheet.create({
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   badge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   badgeText: { fontSize: 10, fontWeight: '600' },
+  noteBox: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  noteLabel: { fontSize: 10, fontWeight: '700', color: '#9ca3af', marginBottom: 2 },
+  noteText: { fontSize: 12, color: '#374151', lineHeight: 17 },
 });

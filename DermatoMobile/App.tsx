@@ -11,6 +11,8 @@ import AnalyzeScreen from './src/screens/AnalyzeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
+import MessagesScreen from './src/screens/MessagesScreen';
+import NotificationsScreen from './src/screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -58,6 +60,8 @@ function RootNavigator() {
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Results" component={ResultsScreen} />
+          <Stack.Screen name="Messages" component={MessagesScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </>
       ) : (
         <Stack.Screen name="Login" component={LoginScreen} />

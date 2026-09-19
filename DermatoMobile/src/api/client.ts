@@ -5,7 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // e.g. 'http://10.0.2.2:8000' for a local docker-compose backend reached from
 // the Android emulator (10.0.2.2 is the emulator's alias for the host
 // machine), or a device's real LAN IP for a physical phone on local dev.
-const API_HOST = 'http://72.61.231.178:8081';
+// Points at the app's current VPS (see DEPLOY.md) — migrated off the old
+// 72.61.231.178 box.
+const API_HOST = 'http://187.127.149.141:8081';
 const BASE_URL = `${API_HOST}/api`;
 
 // For building absolute URLs from the relative paths the backend returns
@@ -84,6 +86,7 @@ export interface SessionOut {
   acne_wsi?: number | null;
   pigmentation_wsi?: number | null;
   wrinkle_wsi?: number | null;
+  doctor_note?: string | null;
 }
 
 export interface TreatmentPlanOut {
@@ -104,3 +107,54 @@ export const getPatientSessions = (patientId: number) =>
 
 export const getTreatmentPlans = (patientId: number) =>
   api.get<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`);
+
+export interface SkinHistory {
+  allergies?: string;
+  current_products?: string;
+  known_conditions?: string;
+  medications?: string;
+  updated_at?: string;
+}
+
+export interface PatientOut {
+  id: number;
+  name: string;
+  age?: number | null;
+  skin_type?: string | null;
+  skin_history?: SkinHistory | null;
+}
+
+export const getPatient = (patientId: number) => api.get<PatientOut>(`/patients/${patientId}`);
+
+export const updateSkinHistory = (patientId: number, data: SkinHistory) =>
+  api.patch<PatientOut>(`/patients/${patientId}/skin-history`, data);
+
+export interface MessageOut {
+  id: number;
+  patient_id: number;
+  sender_id: number;
+  sender_name: string | null;
+  sender_role: 'patient' | 'dermatologist' | 'admin';
+  body: string;
+  created_at: string;
+}
+
+export const getMessages = (patientId: number) => api.get<MessageOut[]>(`/patients/${patientId}/messages`);
+
+export const sendMessage = (patientId: number, body: string) =>
+  api.post<MessageOut>(`/patients/${patientId}/messages`, { body });
+
+export interface NotificationOut {
+  id: number;
+  type: string;
+  message: string;
+  link?: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const getNotifications = () => api.get<NotificationOut[]>('/notifications/');
+
+export const markNotificationRead = (id: number) => api.patch<NotificationOut>(`/notifications/${id}/read`);
+
+export const markAllNotificationsRead = () => api.post('/notifications/read-all');

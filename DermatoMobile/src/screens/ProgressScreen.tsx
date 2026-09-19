@@ -1,9 +1,133 @@
-import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { getPatientSessions, getTreatmentPlans, SessionOut, TreatmentPlanOut } from '../api/client';
+import {
+  getPatientSessions,
+  getTreatmentPlans,
+  getPatient,
+  updateSkinHistory,
+  absoluteUrl,
+  SessionOut,
+  TreatmentPlanOut,
+  SkinHistory,
+} from '../api/client';
 import { CONDITION_LABELS } from '../constants';
+
+type RootStackParamList = { Messages: undefined };
+
+const SKIN_HISTORY_FIELDS: [keyof SkinHistory, string][] = [
+  ['allergies', 'Allergies'],
+  ['current_products', 'Current products'],
+  ['known_conditions', 'Known conditions'],
+  ['medications', 'Medications'],
+];
+
+function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; history: SkinHistory | null | undefined; onSaved: (h: SkinHistory) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState<SkinHistory>({
+    allergies: history?.allergies || '',
+    current_products: history?.current_products || '',
+    known_conditions: history?.known_conditions || '',
+    medications: history?.medications || '',
+  });
+
+  const hasAny = SKIN_HISTORY_FIELDS.some(([key]) => history?.[key]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const { data } = await updateSkinHistory(patientId, form);
+      onSaved(data.skin_history || form);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeaderRow}>
+        <Text style={styles.cardTitle}>Skin History</Text>
+        {!editing && (
+          <TouchableOpacity onPress={() => setEditing(true)}>
+            <Text style={styles.editLink}>Edit</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {editing ? (
+        <View>
+          {SKIN_HISTORY_FIELDS.map(([key, label]) => (
+            <View key={key} style={{ marginBottom: 10 }}>
+              <Text style={styles.fieldLabel}>{label}</Text>
+              <TextInput
+                value={form[key] || ''}
+                onChangeText={(v) => setForm({ ...form, [key]: v })}
+                style={styles.input}
+                placeholder={`Add ${label.toLowerCase()}...`}
+              />
+            </View>
+          ))}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+              <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={() => setEditing(false)}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : hasAny ? (
+        SKIN_HISTORY_FIELDS.map(([key, label]) => (
+          history?.[key] ? (
+            <View key={key} style={styles.historyRow}>
+              <Text style={styles.historyLabel}>{label}</Text>
+              <Text style={styles.historyValue}>{history[key]}</Text>
+            </View>
+          ) : null
+        ))
+      ) : (
+        <Text style={styles.emptyText}>No skin history recorded yet.</Text>
+      )}
+    </View>
+  );
+}
+
+function BeforeAfterCard({ first, latest }: { first: SessionOut; latest: SessionOut }) {
+  const [showAfter, setShowAfter] = useState(true);
+  const fade = useRef(new Animated.Value(1)).current;
+
+  const toggle = () => {
+    Animated.timing(fade, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
+      setShowAfter((v) => !v);
+      Animated.timing(fade, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+    });
+  };
+
+  const shown = showAfter ? latest : first;
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>Before &amp; After</Text>
+      <Text style={styles.cardSubtitle}>Tap the photo to compare your first and most recent scan</Text>
+      <TouchableOpacity onPress={toggle} activeOpacity={0.85}>
+        <Animated.View style={{ opacity: fade }}>
+          <Image source={{ uri: absoluteUrl(shown.image_url) }} style={styles.compareImage} />
+        </Animated.View>
+        <View style={styles.compareLabel}>
+          <Text style={styles.compareLabelText}>{showAfter ? 'After (latest)' : 'Before (first)'}</Text>
+        </View>
+      </TouchableOpacity>
+      <View style={styles.compareDateRow}>
+        <Text style={styles.compareDateText}>{new Date(first.captured_at).toLocaleDateString()}</Text>
+        <Text style={styles.compareDateText}>{new Date(latest.captured_at).toLocaleDateString()}</Text>
+      </View>
+    </View>
+  );
+}
 
 const TRACK_HEIGHT = 90;
 const DOT_COL_WIDTH = 44;
@@ -56,17 +180,24 @@ const OUTCOME_META: Record<string, { color: string; label: string }> = {
 
 export default function ProgressScreen() {
   const { patientId } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
+  const [skinHistory, setSkinHistory] = useState<SkinHistory | null | undefined>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!patientId) return;
     setLoading(true);
     try {
-      const [s, p] = await Promise.all([getPatientSessions(patientId), getTreatmentPlans(patientId)]);
+      const [s, p, patient] = await Promise.all([
+        getPatientSessions(patientId),
+        getTreatmentPlans(patientId),
+        getPatient(patientId),
+      ]);
       setSessions(s.data);
       setPlans([...p.data].reverse());
+      setSkinHistory(patient.data.skin_history);
     } finally {
       setLoading(false);
     }
@@ -80,7 +211,12 @@ export default function ProgressScreen() {
       contentContainerStyle={{ padding: 20 }}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
     >
-      <Text style={styles.title}>Progress</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Progress</Text>
+        <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
+          <Text style={styles.messagesLink}>Messages</Text>
+        </TouchableOpacity>
+      </View>
 
       {sessions.length === 0 ? (
         <Text style={styles.emptyText}>No sessions recorded yet — run an analysis to start tracking.</Text>
@@ -94,6 +230,8 @@ export default function ProgressScreen() {
         </View>
       )}
 
+      {sessions.length >= 2 && <BeforeAfterCard first={sessions[0]} latest={sessions[sessions.length - 1]} />}
+
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Treatment Plans</Text>
         {plans.length === 0 ? (
@@ -104,6 +242,12 @@ export default function ProgressScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.planCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
                 <Text style={styles.planRemedy}>{p.remedy_type} · started {new Date(p.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+                {p.status === 'active' && p.expected_recheck_at && (
+                  <Text style={styles.planRecheck}>
+                    {new Date(p.expected_recheck_at) < new Date() ? 'Recheck overdue since ' : 'Recheck due '}
+                    {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </Text>
+                )}
               </View>
               {p.status === 'active' ? (
                 <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>
@@ -116,6 +260,10 @@ export default function ProgressScreen() {
           ))
         )}
       </View>
+
+      {patientId != null && (
+        <SkinHistoryCard patientId={patientId} history={skinHistory} onSaved={setSkinHistory} />
+      )}
     </ScrollView>
   );
 }
@@ -141,8 +289,27 @@ const styles = StyleSheet.create({
   planRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
   planCondition: { fontSize: 13, fontWeight: '600', color: '#374151' },
   planRemedy: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  planRecheck: { fontSize: 11, color: '#d97706', marginTop: 2, fontWeight: '600' },
   activeBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   activeBadgeText: { color: '#0d9488', fontSize: 11, fontWeight: '600' },
   outcomeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   outcomeBadgeText: { fontSize: 11, fontWeight: '600' },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  messagesLink: { fontSize: 13, fontWeight: '600', color: '#0d9488' },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  editLink: { fontSize: 12, fontWeight: '600', color: '#0d9488' },
+  fieldLabel: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
+  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827' },
+  saveButton: { backgroundColor: '#0d9488', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  saveButtonText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  cancelButton: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  cancelButtonText: { color: '#6b7280', fontWeight: '600', fontSize: 12 },
+  historyRow: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  historyLabel: { fontSize: 10, color: '#9ca3af' },
+  historyValue: { fontSize: 13, color: '#374151', marginTop: 1 },
+  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: '#e5e7eb' },
+  compareLabel: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  compareLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  compareDateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  compareDateText: { fontSize: 11, color: '#9ca3af' },
 });

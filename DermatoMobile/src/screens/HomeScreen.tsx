@@ -1,28 +1,42 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { getPatientSessions, getTreatmentPlans, SessionOut, TreatmentPlanOut } from '../api/client';
+import { getPatientSessions, getTreatmentPlans, getNotifications, SessionOut, TreatmentPlanOut } from '../api/client';
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { CONDITION_LABELS } from '../constants';
 
 type TabParamList = { Home: undefined; Analyze: undefined; History: undefined; Progress: undefined };
+// Notifications lives in the root Stack (a sibling of MainTabs), same as
+// Results/Messages — navigate() bubbles up to find it from here.
+type RootStackParamList = { Notifications: undefined };
+type HomeNavigationProp = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList>,
+  NativeStackNavigationProp<RootStackParamList>
+>;
 
 export default function HomeScreen() {
   const { patientId, fullName, logout } = useAuth();
-  const navigation = useNavigation<BottomTabNavigationProp<TabParamList>>();
+  const navigation = useNavigation<HomeNavigationProp>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!patientId) return;
     setLoading(true);
     try {
-      const [s, p] = await Promise.all([getPatientSessions(patientId), getTreatmentPlans(patientId)]);
+      const [s, p, n] = await Promise.all([
+        getPatientSessions(patientId),
+        getTreatmentPlans(patientId),
+        getNotifications(),
+      ]);
       setSessions(s.data);
       setPlans(p.data);
+      setUnreadCount(n.data.filter((x) => !x.is_read).length);
     } finally {
       setLoading(false);
     }
@@ -50,9 +64,15 @@ export default function HomeScreen() {
           <Text style={styles.title}>Welcome back{fullName ? `, ${fullName.split(' ')[0]}` : ''}</Text>
           <Text style={styles.subtitle}>Here's where your skin journey stands today</Text>
         </View>
-        <TouchableOpacity onPress={logout}>
-          <Text style={styles.logout}>Log out</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notifications')}>
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && <View style={styles.bellDot} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={logout}>
+            <Text style={styles.logout}>Log out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {overduePlan && (
@@ -114,6 +134,10 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   title: { fontSize: 22, fontWeight: '700', color: '#111827' },
   subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  bellButton: { padding: 2 },
+  bellIcon: { fontSize: 18 },
+  bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   overdueBanner: { backgroundColor: '#fffbeb', borderRadius: 12, padding: 12, marginBottom: 16 },
   overdueText: { fontSize: 13, color: '#92400e' },
