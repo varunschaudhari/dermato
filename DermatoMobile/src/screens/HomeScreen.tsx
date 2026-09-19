@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } 
 import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Bell } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
@@ -121,7 +122,7 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notifications')}>
-            <Text style={styles.bellIcon}>🔔</Text>
+            <Bell size={20} color="#374151" strokeWidth={2} />
             {unreadCount > 0 && <View style={styles.bellDot} />}
           </TouchableOpacity>
           <TouchableOpacity onPress={logout}>
@@ -242,7 +243,6 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   bellButton: { padding: 2 },
-  bellIcon: { fontSize: 18 },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   alertBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 12, padding: 13, marginBottom: 16 },

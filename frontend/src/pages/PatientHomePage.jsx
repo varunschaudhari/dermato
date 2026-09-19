@@ -1,9 +1,8 @@
-import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import {
   ScanFace, TrendingUp, CalendarClock, Gauge, ArrowUpRight, ArrowDownRight,
-  ClipboardList, Bell, ChevronRight, Sparkles, AlertTriangle,
+  ClipboardList, Bell, ChevronRight, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getPatient, getPatientSessions, getTreatmentPlans, getAppointments, getNotifications } from '../services/api'
@@ -12,6 +11,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
@@ -29,9 +29,8 @@ function getPriorityAlert({ plans, upcomingAppointment, notifications }) {
     const label = CONDITION_LABELS[overduePlan.condition] || overduePlan.condition
     return {
       key: 'overdue',
-      className: 'flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-800 dark:text-amber-300',
-      icon: AlertTriangle,
-      message: `Your ${label} recheck is overdue — run a new analysis or book a follow-up.`,
+      variant: 'warning',
+      title: `Your ${label} recheck is overdue — run a new analysis or book a follow-up.`,
       actions: [
         { to: '/', label: 'New Analysis' },
         { to: '/appointments', label: 'Book Follow-up' },
@@ -44,9 +43,9 @@ function getPriorityAlert({ plans, upcomingAppointment, notifications }) {
     if (hoursAway <= 48) {
       return {
         key: 'appointment',
-        className: 'flex items-start gap-3 bg-brand-50 dark:bg-brand-900/20 border-brand-100 dark:border-brand-800 text-brand-800 dark:text-brand-300',
+        variant: 'info',
         icon: CalendarClock,
-        message: `Appointment with Dr. ${upcomingAppointment.doctor_name} on ${new Date(upcomingAppointment.scheduled_at).toLocaleString(undefined, {
+        title: `Appointment with Dr. ${upcomingAppointment.doctor_name} on ${new Date(upcomingAppointment.scheduled_at).toLocaleString(undefined, {
           weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
         })}.`,
         actions: [{ to: '/appointments', label: 'View details' }],
@@ -58,9 +57,9 @@ function getPriorityAlert({ plans, upcomingAppointment, notifications }) {
   if (unreadCount > 0) {
     return {
       key: 'notifications',
-      className: 'flex items-start gap-3 bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300',
+      variant: 'neutral',
       icon: Bell,
-      message: `You have ${unreadCount} unread update${unreadCount === 1 ? '' : 's'} — tap to view.`,
+      title: `You have ${unreadCount} unread update${unreadCount === 1 ? '' : 's'} — tap to view.`,
       actions: [{ to: '/notifications', label: 'View' }],
     }
   }
@@ -82,26 +81,6 @@ function HeroSparkline({ sessions }) {
         </LineChart>
       </ResponsiveContainer>
     </div>
-  )
-}
-
-function PriorityBanner({ alert }) {
-  if (!alert) return null
-  const Icon = alert.icon
-  return (
-    <Card className={alert.className}>
-      <Icon className="w-5 h-5 mt-0.5 shrink-0" />
-      <div className="flex-1 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-medium">{alert.message}</p>
-        <div className="flex gap-2 shrink-0">
-          {alert.actions.map((action) => (
-            <Button key={action.to} as={Link} to={action.to} size="sm" variant="outline">
-              {action.label}
-            </Button>
-          ))}
-        </div>
-      </div>
-    </Card>
   )
 }
 
@@ -162,7 +141,7 @@ export default function PatientHomePage() {
         action={<LastUpdated timestamp={sessionsUpdatedAt} />}
       />
 
-      <PriorityBanner alert={priorityAlert} />
+      {priorityAlert && <Alert {...priorityAlert} />}
 
       <div className="grid sm:grid-cols-3 gap-3">
         <Button as={Link} to="/" icon={ScanFace} className="justify-center py-4">

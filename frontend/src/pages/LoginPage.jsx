@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext'
 import { homePathFor } from '../utils/roleHome'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
+import FormField from '../components/ui/FormField'
 import AuthLayout from '../components/ui/AuthLayout'
 
 export default function LoginPage() {
@@ -39,39 +40,29 @@ export default function LoginPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
-            <div>
-              <label htmlFor="login-email" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Email</label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  id="login-email"
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-                />
-              </div>
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label htmlFor="login-password" className="block text-sm text-gray-600 dark:text-gray-400">Password</label>
+            <FormField
+              id="login-email"
+              label="Email"
+              icon={Mail}
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            <FormField
+              id="login-password"
+              label="Password"
+              labelRight={
                 <Link to="/forgot-password" className="text-xs text-brand-700 dark:text-brand-400 font-medium">
                   Forgot password?
                 </Link>
-              </div>
-              <div className="relative">
-                <Lock className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  id="login-password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-                />
-              </div>
-            </div>
+              }
+              icon={Lock}
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
             <Button type="submit" disabled={loading} fullWidth>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>

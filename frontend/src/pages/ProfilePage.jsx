@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
+import FormField from '../components/ui/FormField'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
@@ -62,31 +63,21 @@ export default function ProfilePage() {
           {profileError && (
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{profileError}</p>
           )}
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Full name</label>
-            <div className="relative">
-              <UserIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                required
-                value={profileForm.full_name}
-                onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Email</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="email"
-                required
-                value={profileForm.email}
-                onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-          </div>
+          <FormField
+            label="Full name"
+            icon={UserIcon}
+            required
+            value={profileForm.full_name}
+            onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
+          />
+          <FormField
+            label="Email"
+            icon={Mail}
+            type="email"
+            required
+            value={profileForm.email}
+            onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+          />
           <Button type="submit" disabled={profileMutation.isPending} size="sm">
             {profileMutation.isPending ? 'Saving...' : 'Save changes'}
           </Button>
@@ -99,33 +90,23 @@ export default function ProfilePage() {
           {passwordError && (
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{passwordError}</p>
           )}
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Current password</label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="password"
-                required
-                value={passwordForm.current_password}
-                onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">New password</label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={passwordForm.new_password}
-                onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-          </div>
+          <FormField
+            label="Current password"
+            icon={KeyRound}
+            type="password"
+            required
+            value={passwordForm.current_password}
+            onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+          />
+          <FormField
+            label="New password"
+            icon={KeyRound}
+            type="password"
+            required
+            minLength={8}
+            value={passwordForm.new_password}
+            onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+          />
           <Button type="submit" disabled={passwordMutation.isPending} size="sm">
             {passwordMutation.isPending ? 'Updating...' : 'Update password'}
           </Button>

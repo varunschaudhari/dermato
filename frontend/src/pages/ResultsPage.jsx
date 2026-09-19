@@ -3,12 +3,13 @@ import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from 'recharts'
-import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, AlertTriangle, Images } from 'lucide-react'
+import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images } from 'lucide-react'
 import { getPatientSessions } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
 import Card from '../components/ui/Card'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import Button from '../components/ui/Button'
+import Alert from '../components/ui/Alert'
 import ClinicalFooter from '../components/ui/ClinicalFooter'
 
 const REC_TYPE_ICON = {
@@ -60,25 +61,15 @@ function TriageBanner({ severityToShow, recommendationsToShow }) {
   const needsAttention = hasReferral || hasSevere
 
   return (
-    <Card
-      className={
+    <Alert
+      variant={needsAttention ? 'warning' : 'info'}
+      title={
         needsAttention
-          ? 'flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-800 text-amber-800 dark:text-amber-300'
-          : 'flex items-start gap-3 bg-brand-50/60 dark:bg-brand-900/20'
+          ? 'One or more areas are worth a professional look — see the recommendation below.'
+          : 'Your results look manageable — see your personalized recommendations below.'
       }
-    >
-      <AlertTriangle className="w-5 h-5 mt-0.5 shrink-0" />
-      <div>
-        <p className="text-sm font-medium">
-          {needsAttention
-            ? 'One or more areas are worth a professional look — see the recommendation below.'
-            : 'Your results look manageable — see your personalized recommendations below.'}
-        </p>
-        <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-          This is not a diagnosis and does not replace a clinical visit. See a doctor promptly if any area is bleeding, rapidly changing, or not healing — regardless of this result.
-        </p>
-      </div>
-    </Card>
+      footnote="This is not a diagnosis and does not replace a clinical visit. See a doctor promptly if any area is bleeding, rapidly changing, or not healing — regardless of this result."
+    />
   )
 }
 

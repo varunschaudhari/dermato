@@ -8,6 +8,7 @@ import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
+import FormField from '../components/ui/FormField'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import LastUpdated from '../components/ui/LastUpdated'
@@ -67,70 +68,57 @@ function BookingForm({ isPatient, patientId }) {
         {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
 
         {!isPatient && (
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Patient</label>
-            <select
-              value={form.patient_id}
-              onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              required
-            >
-              <option value="">Select a patient…</option>
-              {patients.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Dermatologist</label>
-          <select
-            value={form.doctor_id}
-            onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
-            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          <FormField
+            label="Patient"
+            as="select"
+            value={form.patient_id}
+            onChange={(e) => setForm({ ...form, patient_id: e.target.value })}
             required
           >
-            <option value="">Select a dermatologist…</option>
-            {doctors.map((d) => (
-              <option key={d.id} value={d.id}>{d.full_name}</option>
+            <option value="">Select a patient…</option>
+            {patients.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
-          </select>
-        </div>
+          </FormField>
+        )}
+
+        <FormField
+          label="Dermatologist"
+          as="select"
+          value={form.doctor_id}
+          onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
+          required
+        >
+          <option value="">Select a dermatologist…</option>
+          {doctors.map((d) => (
+            <option key={d.id} value={d.id}>{d.full_name}</option>
+          ))}
+        </FormField>
 
         <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Date</label>
-            <input
-              type="date"
-              value={form.date}
-              onChange={(e) => setForm({ ...form, date: e.target.value })}
-              min={new Date().toISOString().split('T')[0]}
-              className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Time</label>
-            <input
-              type="time"
-              value={form.time}
-              onChange={(e) => setForm({ ...form, time: e.target.value })}
-              className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              required
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Reason (optional)</label>
-          <input
-            value={form.reason}
-            onChange={(e) => setForm({ ...form, reason: e.target.value })}
-            placeholder="e.g. Follow-up on acne treatment"
-            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          <FormField
+            label="Date"
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm({ ...form, date: e.target.value })}
+            min={new Date().toISOString().split('T')[0]}
+            required
+          />
+          <FormField
+            label="Time"
+            type="time"
+            value={form.time}
+            onChange={(e) => setForm({ ...form, time: e.target.value })}
+            required
           />
         </div>
+
+        <FormField
+          label="Reason (optional)"
+          value={form.reason}
+          onChange={(e) => setForm({ ...form, reason: e.target.value })}
+          placeholder="e.g. Follow-up on acne treatment"
+        />
 
         <Button type="submit" disabled={mutation.isPending}>
           {mutation.isPending ? 'Booking...' : 'Book Appointment'}
