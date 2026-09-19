@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 _face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+_eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
 
 # Average adult bizygomatic (cheekbone-to-cheekbone) face width, in cm — used
 # to turn a detected face's pixel width into a per-photo cm-per-pixel scale.
@@ -14,7 +15,7 @@ _face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_front
 _AVG_FACE_WIDTH_CM = 14.0
 
 # Same skin-tone band quality_gate.py already uses to sanity-check "is there
-# skin in this photo at all" — reused here to exclude hair/eyebrows/eyes from
+# skin in this photo at all" — reused here to exclude hair/eyebrows from
 # inside the face box, not just crop to a rectangle.
 _SKIN_YCRCB_LOW = (0, 140, 85)
 _SKIN_YCRCB_HIGH = (255, 175, 125)
@@ -63,9 +64,45 @@ def detect_and_calibrate(image: np.ndarray) -> Optional[FaceCalibration]:
     ycrcb = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)
     skin = cv2.inRange(ycrcb, _SKIN_YCRCB_LOW, _SKIN_YCRCB_HIGH)
     mask = cv2.bitwise_and(mask, skin)
+
+    _exclude_eyes_and_mouth(mask, gray, x, y, fw, fh)
+
     # Skin-tone masks are speckled pixel-by-pixel; closing small gaps avoids
     # a lesion sitting on a few off-color pixels being excluded by accident.
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
 
     return FaceCalibration(scale_cm_per_px=scale_cm_per_px, skin_mask=mask)
+
+
+def _exclude_eyes_and_mouth(mask: np.ndarray, gray: np.ndarray, x: int, y: int, fw: int, fh: int) -> None:
+    """Cuts eyes/eyebrows and the mouth out of `mask` in place. These are the
+    single biggest source of false "wrinkle"/"pigmentation" detections on a
+    real portrait — eyebrow and eyelid edges are stronger than most real
+    wrinkle lines, and lip color often falls inside the same HSV band as
+    genuine dark spots. Without real facial landmarks, eyes are detected
+    directly (reliable even with a neutral expression); the mouth is
+    estimated proportionally, since Haar's smile cascade needs visible teeth
+    and misses a closed, neutral mouth.
+    """
+    face_roi = gray[y:y + fh, x:x + fw]
+    eyes = _eye_cascade.detectMultiScale(face_roi, scaleFactor=1.1, minNeighbors=5, minSize=(fw // 10, fh // 10))
+    for ex, ey, ew, eh in eyes:
+        # Padded well beyond the raw eye box to also cover eyebrows above and
+        # the under-eye area — the goal is removing the whole high-contrast
+        # eye region, not just the eye itself.
+        pad_w, pad_top, pad_bot = int(ew * 0.6), int(eh * 1.4), int(eh * 0.5)
+        ex0 = max(0, x + ex - pad_w)
+        ex1 = min(mask.shape[1], x + ex + ew + pad_w)
+        ey0 = max(0, y + ey - pad_top)
+        ey1 = min(mask.shape[0], y + ey + eh + pad_bot)
+        mask[ey0:ey1, ex0:ex1] = 0
+
+    # Mouth: proportional estimate (roughly the lower-third, horizontally
+    # centered) rather than cascade-detected — robust across expressions,
+    # where a smile-only detector would miss a neutral/closed mouth.
+    mx0 = x + int(fw * 0.22)
+    mx1 = x + int(fw * 0.78)
+    my0 = y + int(fh * 0.68)
+    my1 = y + int(fh * 0.95)
+    mask[max(0, my0):min(mask.shape[0], my1), max(0, mx0):min(mask.shape[1], mx1)] = 0

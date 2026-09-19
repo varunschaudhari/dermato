@@ -102,7 +102,7 @@ async def analyze_image(
     acne = acne_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
     pigmentation = pigmentation_analyzer.analyze(processed, skin_mask=skin_mask)
     wrinkle = wrinkle_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
-    pore = pore_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
+    pore = pore_analyzer.analyze(processed, skin_mask=skin_mask)
 
     # Normalized regions from the same classical segmentation, so the frontend
     # can plot what each analyzer actually looked at on the uploaded photo.

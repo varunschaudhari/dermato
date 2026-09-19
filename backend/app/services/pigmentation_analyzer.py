@@ -12,16 +12,41 @@ class PigmentationParams:
 
 
 def _pigment_mask(image: np.ndarray, skin_mask: Optional[np.ndarray] = None) -> np.ndarray:
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    # Brown/dark pigmentation mask in HSV
-    lower = np.array([0, 20, 30])
-    upper = np.array([30, 255, 200])
-    mask = cv2.inRange(hsv, lower, upper)
+    """Flags pixels that are notably darker than their LOCAL surroundings,
+    rather than pixels that fall in a fixed absolute color range.
+
+    The old approach (a fixed HSV brown/dark band) reads differently on
+    different skin tones by construction — a tan/brown complexion has more
+    pixels inside "brown/dark" than a fair one even with zero real
+    hyperpigmentation, which is exactly the bias a real accuracy check turned
+    up. Black-hat morphology fixes this by comparing each pixel to a local
+    baseline (its own neighborhood) instead of a global constant: the kernel
+    is much larger than a real dark spot but much smaller than the whole
+    face, so a genuine patch that's darker than its immediate surroundings
+    pops out, while smooth lighting/shading gradients — which vary slowly
+    over a large area — get subtracted away entirely.
+    """
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    dim = min(image.shape[0], image.shape[1])
+    k = max(15, (dim // 20) | 1)  # odd kernel, ~5% of the shorter side
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k))
+    blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, kernel)
+    _, mask = cv2.threshold(blackhat, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    # Otsu always finds *a* split, even across pure sensor noise on genuinely
+    # clear skin — an absolute floor keeps that from being read as "spots".
+    _, noise_floor = cv2.threshold(blackhat, 8, 255, cv2.THRESH_BINARY)
+    mask = cv2.bitwise_and(mask, noise_floor)
     # Without this, dark hair falling across the frame reads as one giant
     # "pigmented patch" — restricting to the detected skin region (when a face
-    # was found) is what actually fixes that, not the HSV band itself.
+    # was found) is what actually fixes that, not the contrast method itself.
+    # Inset by roughly half the kernel radius first: any pixel closer than
+    # that to the mask boundary has hair/background inside its own
+    # neighborhood, so the local-contrast value there reflects the boundary,
+    # not real skin content, and isn't trustworthy.
     if skin_mask is not None:
-        mask = cv2.bitwise_and(mask, skin_mask)
+        erode_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k // 2, k // 2))
+        safe_region = cv2.erode(skin_mask, erode_kernel)
+        mask = cv2.bitwise_and(mask, safe_region)
     return mask
 
 

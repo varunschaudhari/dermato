@@ -189,10 +189,24 @@ def classify_wrinkle(p: WrinkleParams) -> SeverityResult:
 
 def classify_pore(p: PoreParams) -> SeverityResult:
     """Pore severity isn't part of the weighted-index system (no matrix sheet
-    covers it) — kept as the original simple OR-threshold rule, wsi=None."""
-    if p.pore_density_per_cm2 > 100 or p.avg_pore_diameter_um > 250:
+    covers it) — kept as a simple OR-threshold rule, wsi=None.
+
+    These thresholds are a best-effort calibration against a handful of real
+    photos (see the accuracy investigation that replaced pore_analyzer's old
+    absolute-micron claim with these region-relative metrics), not a
+    validated clinical calibration — there's no labeled "confirmed enlarged
+    pores" dataset to calibrate against yet. Revisit once one exists.
+
+    avg_pore_size_pct is normalized against the analyzed region's own pixel
+    count (see pore_analyzer.py), so tightening what counts as "skin" (e.g.
+    also excluding eyes/mouth, added after this was first calibrated) shrinks
+    that denominator and mechanically inflates the percentage for the same
+    real blobs — these thresholds were re-widened to account for that, but
+    it means the two size bands aren't on a perfectly stable absolute scale.
+    """
+    if p.pore_density_pct > 1.5 or p.avg_pore_size_pct > 2.2:
         severity = "severe"
-    elif p.pore_density_per_cm2 >= 50 or p.avg_pore_diameter_um >= 150:
+    elif p.pore_density_pct >= 0.5 or p.avg_pore_size_pct >= 1.5:
         severity = "moderate"
     else:
         severity = "mild"

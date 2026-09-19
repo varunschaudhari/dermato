@@ -104,15 +104,17 @@ def random_wrinkle(sev: str) -> WrinkleParams:
 
 
 def random_pore(sev: str) -> PoreParams:
+    # Matches classify_pore's thresholds in severity_classifier.py: mild
+    # <0.5%/<1.3%, moderate 0.5-1.5%/1.3-2.0%, severe >1.5%/>2.0%.
     ranges = {
-        "mild": (0, 49.9, 0, 149.9),
-        "moderate": (50, 100, 150, 250),
-        "severe": (100.1, 160, 250.1, 350),
+        "mild": (0, 0.49, 0, 1.29),
+        "moderate": (0.5, 1.5, 1.3, 2.0),
+        "severe": (1.51, 2.5, 2.01, 3.0),
     }
     lo_d, hi_d, lo_s, hi_s = ranges[sev]
     return PoreParams(
-        pore_density_per_cm2=round(random.uniform(lo_d, hi_d), 2),
-        avg_pore_diameter_um=round(random.uniform(lo_s, hi_s), 2),
+        pore_density_pct=round(random.uniform(lo_d, hi_d), 3),
+        avg_pore_size_pct=round(random.uniform(lo_s, hi_s), 3),
     )
 
 
