@@ -12,7 +12,13 @@ def _create_patient(client, headers, name="Analysis Patient"):
 
 
 def _fake_jpeg_bytes(color=(120, 90, 200)):
-    image = np.full((200, 200, 3), color, dtype=np.uint8)
+    # 480x480 is quality_gate's resolution floor. A perfectly flat color would
+    # also fail its blur-variance check (a constant image has zero Laplacian
+    # variance), so add noise for texture.
+    rng = np.random.default_rng(0)
+    image = np.full((480, 480, 3), color, dtype=np.int16)
+    image += rng.integers(-18, 19, size=image.shape, dtype=np.int16)
+    image = np.clip(image, 0, 255).astype(np.uint8)
     ok, encoded = cv2.imencode(".jpg", image)
     assert ok
     return encoded.tobytes()
