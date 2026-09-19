@@ -89,6 +89,7 @@ def update_treatment_plan(db, patient_id: int, condition: str, session, severity
         "resolved_at": None,
         "outcome_severity": None,
         "outcome": None,
+        "reminder_sent_at": None,
     }
     db.treatment_plans.insert_one(new_plan_doc)
     return resolved

@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.security import get_current_user, hash_password, require_role
 from app.db.database import get_db, next_id
+from app.services.reminder_scheduler import start_reminder_scheduler
 
 
 def _bootstrap_admin() -> None:
@@ -35,6 +36,7 @@ def _bootstrap_admin() -> None:
 
 
 _bootstrap_admin()
+start_reminder_scheduler()
 
 app = FastAPI(title="Dermato API", version="1.0.0")
 

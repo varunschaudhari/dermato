@@ -40,6 +40,10 @@ class Settings(BaseSettings):
     # Rate limiting (requests per minute) for auth endpoints
     LOGIN_RATE_LIMIT: str = "5/minute"
 
+    # How often the background job checks for treatment plans whose recheck
+    # date has arrived (see app/services/reminder_scheduler.py)
+    REMINDER_CHECK_INTERVAL_MINUTES: int = 60
+
     # Comma-separated list of allowed CORS origins
     CORS_ORIGINS: str = "http://localhost:3000"
 
