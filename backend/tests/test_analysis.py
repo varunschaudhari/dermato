@@ -11,10 +11,15 @@ def _create_patient(client, headers, name="Analysis Patient"):
     return res.json()["id"]
 
 
-def _fake_jpeg_bytes(color=(120, 90, 200)):
+def _fake_jpeg_bytes(color=(130, 150, 200)):
     # 480x480 is quality_gate's resolution floor. A perfectly flat color would
     # also fail its blur-variance check (a constant image has zero Laplacian
-    # variance), so add noise for texture.
+    # variance), so add noise for texture. The base BGR must land inside the
+    # YCrCb skin-tone band quality_gate checks against — (120, 90, 200), the
+    # original color here, actually falls just outside it (Cr=181 vs. the
+    # 175 cutoff), and JPEG's lossy chroma subsampling scatters noisy pixels
+    # around that boundary further, so it passed by accident sometimes and
+    # not others. (130, 150, 200) sits solidly in the middle of the band.
     rng = np.random.default_rng(0)
     image = np.full((480, 480, 3), color, dtype=np.int16)
     image += rng.integers(-18, 19, size=image.shape, dtype=np.int16)
