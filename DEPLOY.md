@@ -1,113 +1,121 @@
-# Deploying Dermato for the friends/family pilot
+# Deploying Dermato
 
-This gets the app onto a real HTTPS URL that anyone can log into, using seeded
-demo data (fake patients, known passwords) — not real patient data. **Do not
-put real patient photos into this deployment.** See the go-live checklist at
-the bottom for what changes before that's safe.
+The app runs on a single VPS via `docker-compose.yml` at the repo root, with
+GitHub Actions auto-deploying every push to `main`. **This is still scoped for
+a friends/family pilot with demo data — not real patient data.** See the
+go-live checklist at the bottom for what changes before that's safe.
 
-Stack: [Fly.io](https://fly.io) for both containers (matches the existing
-Dockerfiles almost exactly, gives you free HTTPS + a persistent disk for
-uploaded photos) + [MongoDB Atlas](https://www.mongodb.com/cloud/atlas)
-free tier for the database (Fly doesn't offer managed MongoDB).　Total cost:
-$0–~$5/mo depending on Fly's current free allowance.
+Stack: one VPS running three containers — `mongo` (official image, data in a
+named Docker volume), `backend` (FastAPI + the trained ML models), and
+`frontend` (nginx serving the built SPA, reverse-proxying `/api`, `/uploads`,
+and `/health` to the backend). No managed database or PaaS — just Docker.
 
-## 1. Create the database (MongoDB Atlas)
+## Current deployment
 
-1. Sign up at mongodb.com/cloud/atlas, create a free **M0** cluster.
-2. Database Access → add a user with a strong generated password.
-3. Network Access → for now, allow `0.0.0.0/0` (Fly's outbound IPs aren't
-   static on the free plan). This is a real tradeoff — see the checklist.
-4. Get the connection string (Connect → Drivers → Python): it looks like
-   `mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority`
+- VPS: `187.127.149.141`, app reachable at `http://187.127.149.141:8081/`
+- Project files live in `/opt/dermato` on the VPS (not a git checkout —
+  populated by the CI deploy job via `rsync`)
+- `/opt/dermato/.env` (root-only, never in git) holds `SECRET_KEY`,
+  `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PUBLIC_ORIGIN`, `FRONTEND_PORT`
 
-## 2. Install flyctl and log in
+## CI/CD
 
-```
-# Windows (PowerShell)
-iwr https://fly.io/install.ps1 -useb | iex
-fly auth signup   # or `fly auth login` if you already have an account
-```
+`.github/workflows/ci.yml` has a `deploy` job that runs after the `backend`
+and `frontend` test jobs pass, only on a push to `main`:
 
-## 3. Deploy the backend
+1. Checks out the repo
+2. `rsync`s it to `/opt/dermato` on the VPS over SSH (excluding `.env` and
+   `backend/uploads`, which exist only on the server and must survive every
+   deploy)
+3. Runs `docker compose up -d --build` on the VPS
 
-```
-cd backend
-fly launch --no-deploy       # creates the app from fly.toml; if "dermato-api"
-                              # is taken, it'll prompt for a different name —
-                              # update the `app = "..."` line in fly.toml to match
-fly volumes create dermato_uploads --size 1   # 1GB, plenty for a pilot
+This needs three repository secrets under **Settings → Secrets and variables
+→ Actions**:
 
-fly secrets set `
-  MONGO_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority" `
-  SECRET_KEY="<run: python -c \"import secrets; print(secrets.token_hex(32))\">" `
-  ADMIN_EMAIL="you@example.com" `
-  ADMIN_PASSWORD="<a real password, not changeme123>" `
-  FRONTEND_URL="https://dermato-app.fly.dev" `
-  CORS_ORIGINS="https://dermato-app.fly.dev"
+- `VPS_HOST` — the server's IP
+- `VPS_USER` — `root`
+- `VPS_SSH_KEY` — a private key whose public half is in that user's
+  `~/.ssh/authorized_keys` on the VPS (a dedicated deploy key, not your
+  personal one)
 
-fly deploy
-fly status   # confirm it's healthy; note the app's https URL
-```
+Once those are set, **every push to `main` deploys automatically** — no
+manual step required.
 
-## 4. Seed demo data into Atlas
+Expect a brief `502` on `/health`/`/api/*` for up to ~60s right after a
+deploy recreates the backend container: nginx resolves the `backend` hostname
+dynamically with a 10s DNS cache (see the comment in
+`frontend/nginx.conf.template`), and needs a cycle or two to pick up the new
+container's IP. It self-heals — not a failed deploy.
 
-From your machine, pointed at the *same* Atlas cluster (one-time, run locally
-— not on Fly):
+## Setting up a new VPS from scratch
+
+Only needed once per server (e.g. migrating to a new host):
 
 ```
-cd backend
-$env:MONGO_URI="mongodb+srv://<user>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority"
-./.venv/Scripts/python.exe seed.py
+# On your machine — generate a dedicated deploy key, install the public half
+# on the VPS, and copy the current commit's tracked files across:
+ssh-keygen -t ed25519 -f dermato_deploy -N ""
+ssh root@<vps-ip> "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys" < dermato_deploy.pub
+git archive HEAD | ssh root@<vps-ip> "mkdir -p /opt/dermato && tar -x -C /opt/dermato"
 ```
 
-This creates the known demo dermatologist/patient accounts (see the script's
-own printed output for the exact emails — the shared password across all of
-them is `password123`). That's intentional for this pilot: anyone with the
-unlisted URL can explore without you handing out real credentials one by one.
-
-## 5. Deploy the frontend
+Then on the VPS, create `/opt/dermato/.env`:
 
 ```
-cd ../frontend
-fly launch --no-deploy       # same deal — rename in fly.toml if the app name is taken
+SECRET_KEY=<run: python -c "import secrets; print(secrets.token_hex(32))">
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=<a real password, not changeme123>
+PUBLIC_ORIGIN=http://<vps-ip>:8081
+FRONTEND_PORT=8081
 ```
 
-If you renamed the backend app in step 3, update `BACKEND_ORIGIN` in
-`frontend/fly.toml` to match (`https://<your-backend-app-name>.fly.dev`) before deploying.
-
 ```
-fly deploy
-fly status   # this URL is what you share with people
+mkdir -p /opt/dermato/backend/uploads
+cd /opt/dermato && docker compose up -d --build
 ```
 
-## 6. Verify
+`ADMIN_EMAIL`/`ADMIN_PASSWORD` seed the one admin account on first boot,
+since Mongo starts empty (see `config.py`) — there's no `seed.py` demo-data
+step in this flow; run it manually (`python backend/seed.py` against the
+VPS's Mongo, or over SSH) if you want the old demo dermatologist/patient
+accounts.
 
-Open the frontend's `https://...fly.dev` URL, log in with one of the seeded
-accounts, run an analysis. If login works, CORS and the nginx proxy are both
-wired correctly.
+Finally, add `VPS_HOST`/`VPS_USER`/`VPS_SSH_KEY` as GitHub secrets so future
+pushes to `main` deploy there automatically.
+
+## Verify
+
+Open `http://<vps-ip>:8081/`, log in with the admin account, register a test
+patient via "New patient? Create an account", and run an analysis. If login
+works and analysis returns a result, CORS, the nginx proxy, and the ML models
+are all wired correctly.
 
 ---
 
 ## Before this touches a real patient
 
 This deployment is deliberately scoped for "friends click around with demo
-data" in under a week. Cross every item here before any real patient's photo
-or information goes in:
+data." Cross every item here before any real patient's photo or information
+goes in:
 
-- **Rotate all credentials.** The seeded accounts' shared `password123` is
-  fine for an unlisted pilot URL and nothing else — wipe and reseed with real,
-  private credentials (or build real self-service signup) before real use.
-- **Lock down Atlas network access** from `0.0.0.0/0` to Fly's actual egress
-  IPs (`fly ips list`, or allocate a static egress IP — a paid Fly feature)
-  once you're past the free-tier pilot.
-- **Move uploaded photos off the local volume to object storage** (S3,
-  Cloudflare R2, Backblaze B2). The Fly volume works fine for a pilot, but it's
-  single-region and doesn't get you off-site backups the way object storage does.
-- **Add backups.** Atlas free tier has no automated backups — at minimum,
-  schedule a periodic `mongodump` before real data accumulates.
+- **Rotate all credentials.** Generate a fresh `ADMIN_PASSWORD` and `SECRET_KEY`
+  before anything beyond a private pilot — reissue if either was ever shared
+  in chat, a screenshot, or a support ticket.
+- **Add database backups.** The Mongo container's data lives in a named
+  Docker volume on a single VPS with no automated backup — at minimum,
+  schedule a periodic `docker exec dermato-mongo-1 mongodump` to somewhere
+  off that server.
+- **Move uploaded photos off the local disk to object storage** (S3,
+  Cloudflare R2, Backblaze B2). `backend/uploads` is a bind mount on the VPS's
+  local disk — fine for a pilot, but single point of failure with no
+  off-site copy.
+- **Put the app behind HTTPS.** It's currently plain `http://` on a raw IP —
+  fine for an unlisted pilot URL, not for anything handling real health data.
+  A reverse proxy (Caddy, nginx + Let's Encrypt) or a domain + Cloudflare in
+  front of the VPS would cover this.
 - **This is still single-tenant.** Every user shares one database — fine for
   one clinic, not for multiple clinics with data that must stay separated.
   Revisit before onboarding a second organization.
-- **No automated tests cover `severity_classifier.py`** — the one module in
-  this codebase that's been rewritten the most. Worth a regression suite
+- **No automated tests cover `severity_classifier.py`** — one of the most
+  frequently rewritten modules in this codebase. Worth a regression suite
   before this drives real treatment recommendations at scale.
