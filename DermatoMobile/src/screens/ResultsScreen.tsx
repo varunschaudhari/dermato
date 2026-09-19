@@ -3,16 +3,11 @@ import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity } from 'rea
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { absoluteUrl } from '../api/client';
+import { CONDITION_LABELS, SEVERITY_META } from '../constants';
 
-const SEVERITY_META: Record<string, { color: string; bg: string; label: string }> = {
-  mild: { color: '#059669', bg: '#d1fae5', label: 'Mild' },
-  moderate: { color: '#d97706', bg: '#fef3c7', label: 'Moderate' },
-  severe: { color: '#dc2626', bg: '#fee2e2', label: 'Severe' },
-};
-
-const CONDITION_LABELS: Record<string, string> = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' };
-
-type RootStackParamList = { Analyze: undefined; Results: { result: any; selected: string[] } };
+// Results lives in the root Stack; Analyze lives inside MainTabs' nested tab
+// navigator, so returning to it goes through MainTabs with a nested params.
+type RootStackParamList = { MainTabs: { screen: string } | undefined; Results: { result: any; selected: string[] } };
 
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
@@ -75,7 +70,7 @@ export default function ResultsScreen() {
 
       <Text style={styles.disclaimer}>{result.recommendations?.disclaimer}</Text>
 
-      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Analyze')}>
+      <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('MainTabs', { screen: 'Analyze' })}>
         <Text style={styles.buttonText}>New Analysis</Text>
       </TouchableOpacity>
     </ScrollView>

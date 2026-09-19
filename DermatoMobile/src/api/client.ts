@@ -64,8 +64,8 @@ export const getMe = () => api.get('/auth/me');
 // mirroring how the web app's AnalyzePage/ResultsPage split that work.
 export const analyzeImage = (patientId: number, photo: { uri: string; type: string; name: string }) => {
   const formData = new FormData();
-  // @ts-expect-error React Native's FormData accepts {uri, type, name} for files, unlike the DOM's File type
-  formData.append('file', { uri: photo.uri, type: photo.type, name: photo.name });
+  // React Native's FormData accepts {uri, type, name} for files, unlike the DOM's File type
+  formData.append('file', { uri: photo.uri, type: photo.type, name: photo.name } as any);
   formData.append('patient_id', String(patientId));
   return api.post<AnalyzeResult>('/analysis/analyze', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

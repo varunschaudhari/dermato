@@ -32,7 +32,7 @@ export default function HistoryScreen() {
         contentContainerStyle={{ padding: 20, paddingTop: 8 }}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
         ListEmptyComponent={
-          !loading ? <Text style={styles.emptyText}>No scans yet — run your first analysis to start tracking.</Text> : null
+          !loading ? <Text style={styles.emptyText}>No scans yet — run your first analysis to start tracking.</Text> : undefined
         }
         renderItem={({ item }) => (
           <View style={styles.card}>

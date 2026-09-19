@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -21,14 +22,31 @@ def _lesion_contours(image: np.ndarray):
     return contours
 
 
-def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026) -> AcneParams:
-    contours = _lesion_contours(image)
+def _in_mask(contour, skin_mask: Optional[np.ndarray]) -> bool:
+    """Keeps a contour only if its centroid falls on skin (skin_mask is None —
+    no face was detected for this photo — keeps everything, unchanged from
+    before this existed, since a tight skin-ROI crop has nothing to mask against)."""
+    if skin_mask is None:
+        return True
+    M = cv2.moments(contour)
+    if M["m00"] == 0:
+        x, y, w, h = cv2.boundingRect(contour)
+        cx, cy = x + w // 2, y + h // 2
+    else:
+        cx, cy = int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"])
+    if cy >= skin_mask.shape[0] or cx >= skin_mask.shape[1]:
+        return False
+    return bool(skin_mask[cy, cx])
+
+
+def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026, skin_mask: Optional[np.ndarray] = None) -> AcneParams:
+    contours = [c for c in _lesion_contours(image) if _in_mask(c, skin_mask)]
 
     lesion_count = len(contours)
     roi_area_cm2 = (image.shape[0] * image.shape[1]) * (scale_cm_per_px ** 2)
     lesion_count_per_cm2 = lesion_count / roi_area_cm2 if roi_area_cm2 > 0 else 0
 
-    redness_index = _compute_redness_index(image)
+    redness_index = _compute_redness_index(image, skin_mask)
     lesion_type, inflammatory_pct = _classify_lesions(contours, image)
 
     return AcneParams(
@@ -39,7 +57,7 @@ def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026) -> AcneParams:
     )
 
 
-def overlay_regions(image: np.ndarray, max_regions: int = 60) -> list:
+def overlay_regions(image: np.ndarray, max_regions: int = 60, skin_mask: Optional[np.ndarray] = None) -> list:
     """Normalized (0-1) bounding boxes of the detected lesions, largest first,
     for drawing on the uploaded photo. Uses the same segmentation as analyze()
     and the same minimum-area cutoff as the lesion classifier."""
@@ -51,6 +69,8 @@ def overlay_regions(image: np.ndarray, max_regions: int = 60) -> list:
     for c in _lesion_contours(image):
         if cv2.contourArea(c) < 0.1:
             continue
+        if not _in_mask(c, skin_mask):
+            continue
         x, y, bw, bh = cv2.boundingRect(c)
         if bw * bh > max_area:
             continue
@@ -59,14 +79,17 @@ def overlay_regions(image: np.ndarray, max_regions: int = 60) -> list:
     return [{"box": b} for _, b in boxes[:max_regions]]
 
 
-def _compute_redness_index(image: np.ndarray) -> float:
-    """Standard Erythema Index EI = (R-G)/(R+G+B)."""
+def _compute_redness_index(image: np.ndarray, skin_mask: Optional[np.ndarray]) -> float:
+    """Standard Erythema Index EI = (R-G)/(R+G+B), averaged over skin pixels
+    only where a mask is available — hair/background would otherwise skew it."""
     r = image[:, :, 2].astype(float)
     g = image[:, :, 1].astype(float)
     b = image[:, :, 0].astype(float)
     denom = r + g + b
     denom[denom == 0] = 1
     ei = (r - g) / denom
+    if skin_mask is not None and skin_mask.any():
+        return float(ei[skin_mask > 0].mean() * 100)
     return float(np.mean(ei) * 100)
 
 

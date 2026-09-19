@@ -5,11 +5,14 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { analyzeImage, getErrorMessage } from '../api/client';
+import { CONDITION_LABELS } from '../constants';
 
 const CONDITIONS = ['acne', 'pigmentation', 'wrinkle', 'pore'] as const;
-const CONDITION_LABELS: Record<string, string> = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' };
 
-type RootStackParamList = { Analyze: undefined; Results: { result: any; selected: string[] } };
+// Results lives in the root Stack (a sibling of MainTabs), not inside the tab
+// navigator Analyze belongs to — navigate() still finds it by bubbling up to
+// the parent navigator, this type just describes where it actually lives.
+type RootStackParamList = { MainTabs: undefined; Results: { result: any; selected: string[] } };
 
 export default function AnalyzeScreen() {
   const [photo, setPhoto] = useState<Asset | null>(null);

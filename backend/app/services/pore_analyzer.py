@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass
@@ -9,13 +10,18 @@ class PoreParams:
     avg_pore_diameter_um: float
 
 
-def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026) -> PoreParams:
+def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026, skin_mask: Optional[np.ndarray] = None) -> PoreParams:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     blurred = cv2.GaussianBlur(gray, (3, 3), 0)
 
     thresh = cv2.adaptiveThreshold(
         blurred, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 3
     )
+    if skin_mask is not None:
+        # Adaptive thresholding fires heavily on hair, fabric weave, and
+        # jewelry — none of that is a pore. Restrict to the detected skin
+        # region (when a face was found) before even looking for contours.
+        thresh = cv2.bitwise_and(thresh, skin_mask)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     um_per_px = scale_cm_per_px * 10_000
@@ -31,7 +37,8 @@ def analyze(image: np.ndarray, scale_cm_per_px: float = 0.026) -> PoreParams:
         diameter_px = 2 * np.sqrt(area / np.pi)
         diameters_um.append(diameter_px * um_per_px)
 
-    roi_area_cm2 = (image.shape[0] * image.shape[1]) * (scale_cm_per_px ** 2)
+    region_pixels = int(np.count_nonzero(skin_mask)) if skin_mask is not None else image.shape[0] * image.shape[1]
+    roi_area_cm2 = region_pixels * (scale_cm_per_px ** 2)
     pore_density_per_cm2 = len(diameters_um) / roi_area_cm2 if roi_area_cm2 > 0 else 0
     avg_pore_diameter_um = float(np.mean(diameters_um)) if diameters_um else 0.0
 

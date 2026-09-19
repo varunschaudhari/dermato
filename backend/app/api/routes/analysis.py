@@ -12,7 +12,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from app.core.config import settings
 from app.core.security import get_current_user
 from app.db.database import get_db, next_id, to_ns
-from app.services import preprocessor, quality_gate, acne_analyzer, pigmentation_analyzer, wrinkle_analyzer, pore_analyzer
+from app.services import preprocessor, quality_gate, acne_analyzer, pigmentation_analyzer, wrinkle_analyzer, pore_analyzer, face_detector
 from app.services.severity_classifier import classify_acne, classify_pigmentation, classify_wrinkle, classify_pore
 from app.services.recommendation_engine import get_recommendations
 from app.services.treatment_tracker import compute_effective_severity, update_treatment_plan
@@ -89,17 +89,27 @@ async def analyze_image(
 
     processed = preprocessor.preprocess(image)
 
-    acne = acne_analyzer.analyze(processed)
-    pigmentation = pigmentation_analyzer.analyze(processed)
-    wrinkle = wrinkle_analyzer.analyze(processed)
-    pore = pore_analyzer.analyze(processed)
+    # If a whole face is in frame (a normal portrait, not a tight skin-ROI
+    # crop), calibrate the physical scale from its detected width and confine
+    # every analyzer to the actual skin region instead of the full frame —
+    # otherwise hair, jewelry, and clothing get scored as skin. No face found
+    # (e.g. a genuine close-up crop) falls back to each analyzer's original,
+    # unmasked, fixed-scale behavior unchanged.
+    calibration = face_detector.detect_and_calibrate(processed)
+    scale = calibration.scale_cm_per_px if calibration else 0.026
+    skin_mask = calibration.skin_mask if calibration else None
+
+    acne = acne_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
+    pigmentation = pigmentation_analyzer.analyze(processed, skin_mask=skin_mask)
+    wrinkle = wrinkle_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
+    pore = pore_analyzer.analyze(processed, scale_cm_per_px=scale, skin_mask=skin_mask)
 
     # Normalized regions from the same classical segmentation, so the frontend
     # can plot what each analyzer actually looked at on the uploaded photo.
     overlays = {
-        "acne": acne_analyzer.overlay_regions(processed),
-        "pigmentation": pigmentation_analyzer.overlay_regions(processed),
-        "wrinkle": wrinkle_analyzer.overlay_regions(processed),
+        "acne": acne_analyzer.overlay_regions(processed, skin_mask=skin_mask),
+        "pigmentation": pigmentation_analyzer.overlay_regions(processed, skin_mask=skin_mask),
+        "wrinkle": wrinkle_analyzer.overlay_regions(processed, skin_mask=skin_mask),
     }
 
     acne_result = classify_acne(acne)
