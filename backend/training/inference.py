@@ -161,7 +161,7 @@ class DermatoInference:
             "pigmentation": PigmentationResult(
                 dark_spot_count=counts["Dark-Spots"],
                 pigmented_area_pct=round(pig_pct, 2),
-                severity=_severity_from_count(counts["Dark-Spots"], thresholds=(3, 8)),
+                severity=_pigmentation_severity_from_area_pct(pig_pct),
             ),
             "wrinkle": WrinkleResult(
                 wrinkle_count=counts["Wrinkles"],
@@ -207,6 +207,19 @@ def _severity_from_count(count: int, thresholds: tuple) -> str:
     if count < high:
         return "moderate"
     return "severe"
+
+
+def _pigmentation_severity_from_area_pct(pct: float) -> str:
+    """Same pigmented-area-% bands as the classical CV path's
+    classify_pigmentation()/_pig_area_band (backend/app/services/severity_classifier.py),
+    which are calibrated against experimental_matrix.xlsx. Using a box-count
+    threshold here instead would grade the same underlying quantity
+    (pigmented_area_pct, already computed above) against an uncalibrated cutoff."""
+    if pct > 30:
+        return "severe"
+    if pct >= 10:
+        return "moderate"
+    return "mild"
 
 
 # Singleton used by FastAPI services

@@ -41,6 +41,15 @@ server {
         proxy_set_header Host $host;
     }
 
+    # Backend's health check lives at its root (/health, not /api/health) —
+    # proxied separately so it's reachable from outside without exposing the
+    # backend's own port.
+    location = /health {
+        set $backend ${BACKEND_ORIGIN};
+        proxy_pass $backend$request_uri;
+        proxy_set_header Host $host;
+    }
+
     # React Router history mode: unknown paths fall back to index.html instead
     # of a 404, letting the client-side router take over.
     location / {

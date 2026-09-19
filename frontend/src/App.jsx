@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ui/ProtectedRoute'
 import ConsentGate from './components/ui/ConsentGate'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
+import PatientRegisterPage from './pages/PatientRegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import AnalyzePage from './pages/AnalyzePage'
@@ -39,6 +40,7 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
+                <Route path="/patient-register" element={<PatientRegisterPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route

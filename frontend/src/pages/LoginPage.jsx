@@ -78,7 +78,10 @@ export default function LoginPage() {
           </form>
         </Card>
       <p className="text-sm text-gray-500 dark:text-gray-400 mt-4 text-center">
-        No account? <Link to="/register" className="text-brand-700 dark:text-brand-400 font-medium">Register</Link>
+        New patient? <Link to="/patient-register" className="text-brand-700 dark:text-brand-400 font-medium">Create an account</Link>
+      </p>
+      <p className="text-xs text-gray-400 dark:text-gray-500 mt-2 text-center">
+        Dermatologist? <Link to="/register" className="text-brand-700 dark:text-brand-400 font-medium">Register here</Link>
       </p>
     </AuthLayout>
   )

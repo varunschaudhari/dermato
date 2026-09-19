@@ -40,6 +40,7 @@ export const login = (email, password) => {
 }
 
 export const register = (data) => api.post('/auth/register', data)
+export const registerPatient = (data) => api.post('/auth/register-patient', data)
 export const forgotPassword = (email) => api.post('/auth/forgot-password', { email })
 export const resetPassword = (token, new_password) => api.post('/auth/reset-password', { token, new_password })
 export const getMe = () => api.get('/auth/me')

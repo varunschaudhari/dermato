@@ -16,10 +16,34 @@ backend/runs/
 *.db
 *.log
 
-# ML model weights (large binaries; not currently loaded by the app code)
+# ML model weights — most of backend/models/ is training diagnostics/checkpoints
+# not needed at runtime, but these three ARE loaded by backend/training/inference.py
+# (imported from app/api/routes/analysis.py) and must stay tracked. A parent
+# directory that's excluded blocks re-inclusion of anything below it, so each
+# level on the path to these files needs its own negation.
 *.pt
 *.pth
-backend/models/
+backend/models/*
+
+!backend/models/acne_detection/
+backend/models/acne_detection/*
+!backend/models/acne_detection/weights/
+backend/models/acne_detection/weights/*
+!backend/models/acne_detection/weights/weights/
+backend/models/acne_detection/weights/weights/*
+!backend/models/acne_detection/weights/weights/best.pt
+
+!backend/models/skin_problems/
+backend/models/skin_problems/*
+!backend/models/skin_problems/weights/
+backend/models/skin_problems/weights/*
+!backend/models/skin_problems/weights/weights/
+backend/models/skin_problems/weights/weights/*
+!backend/models/skin_problems/weights/weights/best.pt
+
+!backend/models/acne_severity/
+backend/models/acne_severity/*
+!backend/models/acne_severity/best.pth
 
 # Node
 node_modules/

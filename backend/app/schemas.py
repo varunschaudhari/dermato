@@ -10,6 +10,14 @@ class PatientCreate(BaseModel):
     skin_type: str
 
 
+class PatientSelfRegister(BaseModel):
+    email: str
+    password: str
+    full_name: str
+    age: int
+    skin_type: str
+
+
 class DoctorSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

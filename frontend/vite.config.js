@@ -39,6 +39,7 @@ export default defineConfig({
     proxy: {
       '/api': backendUrl,
       '/uploads': backendUrl,
+      '/health': backendUrl,
     },
   },
 })

@@ -19,6 +19,7 @@ from app.schemas import (
     PasswordChange,
     PasswordResetConfirm,
     PasswordResetRequest,
+    PatientSelfRegister,
     Token,
     UserCreate,
     UserOut,
@@ -54,6 +55,45 @@ def register(request: Request, payload: UserCreate, db=Depends(get_db)):
     }
     db.users.insert_one(doc)
     return to_ns(doc)
+
+
+@router.post("/register-patient", response_model=Token)
+@limiter.limit(settings.LOGIN_RATE_LIMIT)
+def register_patient(request: Request, payload: PatientSelfRegister, db=Depends(get_db)):
+    """Public patient self-registration — creates the patient record and its
+    login account together and signs them in immediately (no email verification
+    step, matching the same instant-signup behavior as /register)."""
+    if db.users.find_one({"email": payload.email}):
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    patient_doc = {
+        "_id": next_id("patients"),
+        "name": payload.full_name,
+        "age": payload.age,
+        "skin_type": payload.skin_type,
+        "created_at": datetime.utcnow(),
+        # Self-registered patients start unclaimed, same as ones created by an
+        # admin — any dermatologist can pick them up from the patient list.
+        "assigned_doctor_id": None,
+    }
+    db.patients.insert_one(patient_doc)
+
+    user_doc = {
+        "_id": next_id("users"),
+        "email": payload.email,
+        "hashed_password": hash_password(payload.password),
+        "full_name": payload.full_name,
+        "role": "patient",
+        "is_active": True,
+        "created_at": datetime.utcnow(),
+        "patient_id": patient_doc["_id"],
+    }
+    db.users.insert_one(user_doc)
+
+    token = create_access_token(subject=user_doc["email"])
+    return Token(access_token=token)
 
 
 @router.post("/login", response_model=Token)
