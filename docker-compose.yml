@@ -1,25 +1,31 @@
-version: '3.9'
-
 services:
+  mongo:
+    image: mongo:7
+    volumes:
+      - dermato_mongo_data:/data/db
+    # No ports published — reachable only from other containers on this
+    # compose network, never from the host or the internet.
+
   backend:
     build: ./backend
     ports:
-      - "8000:8000"
+      - "${BACKEND_BIND:-127.0.0.1}:${BACKEND_PORT:-8000}:8000"
     volumes:
       - ./backend/uploads:/app/uploads
     environment:
-      # MongoDB runs on the host (not in this compose file) — host.docker.internal
-      # reaches it from inside the container. Needs `extra_hosts` below on Linux.
-      - MONGO_URI=mongodb://host.docker.internal:27017
+      - MONGO_URI=mongodb://mongo:27017
       - MONGO_DB_NAME=dermato
-      - CORS_ORIGINS=http://localhost:3000
-      - FRONTEND_URL=http://localhost:3000
-      # Override these in a .env file for anything beyond local dev
+      # The public URL people actually load the frontend from — same value
+      # for both, since FRONTEND_URL only ever builds links back to the SPA.
+      # Override in .env for anything beyond local dev (e.g. the VPS's
+      # http://<host>:<FRONTEND_PORT>).
+      - CORS_ORIGINS=${PUBLIC_ORIGIN:-http://localhost:3010}
+      - FRONTEND_URL=${PUBLIC_ORIGIN:-http://localhost:3010}
       - SECRET_KEY=${SECRET_KEY:-dev-insecure-secret-change-me}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@dermato.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    depends_on:
+      - mongo
 
   frontend:
     # Production build (nginx serving the compiled bundle) — matches what
@@ -27,8 +33,11 @@ services:
     # instead of docker-compose; it's faster and has hot reload.
     build: ./frontend
     ports:
-      - "3010:8080"
+      - "${FRONTEND_PORT:-3010}:8080"
     environment:
       - BACKEND_ORIGIN=http://backend:8000
     depends_on:
       - backend
+
+volumes:
+  dermato_mongo_data:

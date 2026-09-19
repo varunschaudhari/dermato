@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { absoluteUrl } from '../api/client';
 
 const SEVERITY_META: Record<string, { color: string; bg: string; label: string }> = {
   mild: { color: '#059669', bg: '#d1fae5', label: 'Mild' },
@@ -36,7 +37,7 @@ export default function ResultsScreen() {
       </View>
 
       {result.image_url ? (
-        <Image source={{ uri: `http://10.0.2.2:8000${result.image_url}` }} style={styles.photo} />
+        <Image source={{ uri: absoluteUrl(result.image_url) }} style={styles.photo} />
       ) : null}
 
       <View style={styles.grid}>

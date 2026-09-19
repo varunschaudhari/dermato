@@ -1,10 +1,18 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// 10.0.2.2 is the Android emulator's alias for the host machine — the backend
-// runs there via docker-compose on port 8000. A physical device would need the
-// host's real LAN IP (or a tunnel URL) instead; not needed for this dev setup.
-const BASE_URL = 'http://10.0.2.2:8000/api';
+// Single place to point the app at a backend. Swap API_HOST to retarget —
+// e.g. 'http://10.0.2.2:8000' for a local docker-compose backend reached from
+// the Android emulator (10.0.2.2 is the emulator's alias for the host
+// machine), or a device's real LAN IP for a physical phone on local dev.
+const API_HOST = 'http://72.61.231.178:8081';
+const BASE_URL = `${API_HOST}/api`;
+
+// For building absolute URLs from the relative paths the backend returns
+// (e.g. session.image_url === "/uploads/xyz.jpg").
+export function absoluteUrl(path: string): string {
+  return path.startsWith('http') ? path : `${API_HOST}${path}`;
+}
 
 export const api = axios.create({ baseURL: BASE_URL });
 
@@ -63,3 +71,36 @@ export const analyzeImage = (patientId: number, photo: { uri: string; type: stri
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
+
+export interface SessionOut {
+  id: number;
+  patient_id: number;
+  captured_at: string;
+  image_url: string;
+  acne_severity?: Severity;
+  pigmentation_severity?: Severity;
+  wrinkle_severity?: Severity;
+  pore_severity?: Severity;
+  acne_wsi?: number | null;
+  pigmentation_wsi?: number | null;
+  wrinkle_wsi?: number | null;
+}
+
+export interface TreatmentPlanOut {
+  id: number;
+  condition: string;
+  started_at: string;
+  severity_at_start: Severity;
+  remedy_type: string;
+  remedy_text: string;
+  duration_weeks?: string | null;
+  expected_recheck_at?: string | null;
+  status: 'active' | 'resolved';
+  outcome?: 'improved' | 'unchanged' | 'worsened' | null;
+}
+
+export const getPatientSessions = (patientId: number) =>
+  api.get<SessionOut[]>(`/sessions/patient/${patientId}`);
+
+export const getTreatmentPlans = (patientId: number) =>
+  api.get<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`);
