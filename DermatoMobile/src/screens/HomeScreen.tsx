@@ -4,7 +4,14 @@ import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-n
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { getPatientSessions, getTreatmentPlans, getNotifications, SessionOut, TreatmentPlanOut } from '../api/client';
+import {
+  getPatientSessions,
+  getTreatmentPlans,
+  getNotifications,
+  SessionOut,
+  TreatmentPlanOut,
+  NotificationOut,
+} from '../api/client';
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { CONDITION_LABELS } from '../constants';
 
@@ -17,12 +24,50 @@ type HomeNavigationProp = CompositeNavigationProp<
   NativeStackNavigationProp<RootStackParamList>
 >;
 
+type PriorityAlert = { key: string; kind: 'warning' | 'info'; message: string; actionLabel: string };
+
+// Mirrors the web app's getPriorityAlert (PatientHomePage.jsx): surfaces the
+// single most relevant thing right now, in priority order. Mobile has no
+// appointments feature (web-only), so the tiers here are overdue recheck >
+// unread notifications — one tier short of web's, not a different design.
+function getPriorityAlert(plans: TreatmentPlanOut[], notifications: NotificationOut[]): PriorityAlert | null {
+  const overduePlan = plans.find(
+    (p) => p.status === 'active' && p.expected_recheck_at && new Date(p.expected_recheck_at) < new Date()
+  );
+  if (overduePlan) {
+    const label = CONDITION_LABELS[overduePlan.condition] || overduePlan.condition;
+    return {
+      key: 'overdue',
+      kind: 'warning',
+      message: `Your ${label} recheck is overdue — run a new analysis to see how it's progressing.`,
+      actionLabel: 'Analyze now',
+    };
+  }
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  if (unreadCount > 0) {
+    return {
+      key: 'notifications',
+      kind: 'info',
+      message: `You have ${unreadCount} unread update${unreadCount === 1 ? '' : 's'} — tap to view.`,
+      actionLabel: 'View',
+    };
+  }
+  return null;
+}
+
+function recheckLabel(expectedRecheckAt?: string | null): { text: string; overdue: boolean } | null {
+  if (!expectedRecheckAt) return null;
+  const overdue = new Date(expectedRecheckAt) < new Date();
+  const date = new Date(expectedRecheckAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return { text: overdue ? `Recheck overdue since ${date}` : `Recheck due ${date}`, overdue };
+}
+
 export default function HomeScreen() {
   const { patientId, fullName, logout } = useAuth();
   const navigation = useNavigation<HomeNavigationProp>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState<NotificationOut[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -36,7 +81,7 @@ export default function HomeScreen() {
       ]);
       setSessions(s.data);
       setPlans(p.data);
-      setUnreadCount(n.data.filter((x) => !x.is_read).length);
+      setNotifications(n.data);
     } finally {
       setLoading(false);
     }
@@ -48,10 +93,20 @@ export default function HomeScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const latestSession = sessions[sessions.length - 1];
+  const previousSession = sessions[sessions.length - 2];
   const score = computeSkinScoreFromSession(latestSession);
+  const previousScore = computeSkinScoreFromSession(previousSession);
+  const delta = score != null && previousScore != null ? score - previousScore : null;
   const meta = scoreMeta(score);
   const activePlans = plans.filter((p) => p.status === 'active');
-  const overduePlan = activePlans.find((p) => p.expected_recheck_at && new Date(p.expected_recheck_at) < new Date());
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const priorityAlert = getPriorityAlert(plans, notifications);
+
+  const handleAlertPress = () => {
+    if (!priorityAlert) return;
+    if (priorityAlert.key === 'overdue') navigation.navigate('Analyze');
+    else navigation.navigate('Notifications');
+  };
 
   return (
     <ScrollView
@@ -75,13 +130,19 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {overduePlan && (
-        <View style={styles.overdueBanner}>
-          <Text style={styles.overdueText}>
-            Your {CONDITION_LABELS[overduePlan.condition] || overduePlan.condition} recheck is overdue — run a new
-            analysis to see how it's progressing.
+      {priorityAlert && (
+        <TouchableOpacity
+          style={[styles.alertBanner, priorityAlert.kind === 'warning' ? styles.alertWarning : styles.alertInfo]}
+          onPress={handleAlertPress}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.alertText, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
+            {priorityAlert.message}
           </Text>
-        </View>
+          <Text style={[styles.alertAction, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
+            {priorityAlert.actionLabel} →
+          </Text>
+        </TouchableOpacity>
       )}
 
       {latestSession ? (
@@ -91,9 +152,19 @@ export default function HomeScreen() {
             <Text style={styles.heroScore}>{score}</Text>
             <Text style={styles.heroOutOf}>/ 100</Text>
           </View>
-          <View style={styles.heroPill}>
-            <Text style={styles.heroPillText}>{meta.label}</Text>
+          <View style={styles.heroFooterRow}>
+            <View style={styles.heroPill}>
+              <Text style={styles.heroPillText}>{meta.label}</Text>
+            </View>
+            {delta != null && delta !== 0 && (
+              <Text style={[styles.heroDelta, { color: delta > 0 ? '#86efac' : '#fca5a5' }]}>
+                {delta > 0 ? '↑' : '↓'} {delta > 0 ? '+' : ''}{delta} since last visit
+              </Text>
+            )}
           </View>
+          <TouchableOpacity onPress={() => navigation.navigate('Progress')}>
+            <Text style={styles.heroLink}>See full trend →</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.emptyHero}>
@@ -115,12 +186,47 @@ export default function HomeScreen() {
         {activePlans.length === 0 ? (
           <Text style={styles.emptyText}>No active treatment plans right now.</Text>
         ) : (
-          activePlans.map((p) => (
-            <View key={p.id} style={styles.treatmentRow}>
-              <Text style={styles.treatmentCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
-              <View style={styles.treatmentBadge}>
-                <Text style={styles.treatmentBadgeText}>{p.remedy_type}</Text>
+          activePlans.map((p) => {
+            const recheck = recheckLabel(p.expected_recheck_at);
+            return (
+              <View key={p.id} style={styles.treatmentRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.treatmentCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
+                  {recheck && (
+                    <Text style={[styles.treatmentRecheck, recheck.overdue && styles.treatmentRecheckOverdue]}>
+                      {recheck.text}
+                    </Text>
+                  )}
+                </View>
+                <View style={styles.treatmentBadge}>
+                  <Text style={styles.treatmentBadgeText}>{p.remedy_type}</Text>
+                </View>
               </View>
+            );
+          })
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.cardTitle}>Recent Updates</Text>
+          {notifications.length > 0 && (
+            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+              <Text style={styles.seeAllLink}>See all</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+        {notifications.length === 0 ? (
+          <Text style={styles.emptyText}>Nothing new — you're all caught up.</Text>
+        ) : (
+          notifications.slice(0, 3).map((n) => (
+            <View key={n.id} style={styles.updateRow}>
+              <Text style={[styles.updateText, !n.is_read && styles.updateTextUnread]} numberOfLines={2}>
+                {n.message}
+              </Text>
+              <Text style={styles.updateDate}>
+                {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </Text>
             </View>
           ))
         )}
@@ -139,15 +245,23 @@ const styles = StyleSheet.create({
   bellIcon: { fontSize: 18 },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
-  overdueBanner: { backgroundColor: '#fffbeb', borderRadius: 12, padding: 12, marginBottom: 16 },
-  overdueText: { fontSize: 13, color: '#92400e' },
+  alertBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 12, padding: 13, marginBottom: 16 },
+  alertWarning: { backgroundColor: '#fffbeb' },
+  alertInfo: { backgroundColor: '#f0fdfa' },
+  alertText: { flex: 1, fontSize: 13, fontWeight: '500' },
+  alertAction: { fontSize: 12, fontWeight: '700' },
+  alertTextWarning: { color: '#92400e' },
+  alertTextInfo: { color: '#0f766e' },
   hero: { backgroundColor: '#0f766e', borderRadius: 16, padding: 20, marginBottom: 16 },
   heroLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   heroRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 6 },
   heroScore: { color: '#fff', fontSize: 44, fontWeight: '700' },
   heroOutOf: { color: 'rgba(255,255,255,0.6)', fontSize: 14, marginLeft: 6 },
-  heroPill: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginTop: 8 },
+  heroFooterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 8 },
+  heroPill: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   heroPillText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  heroDelta: { fontSize: 12, fontWeight: '600' },
+  heroLink: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600', marginTop: 12 },
   emptyHero: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb' },
   emptyHeroText: { color: '#6b7280', fontSize: 13 },
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
@@ -155,11 +269,19 @@ const styles = StyleSheet.create({
   primaryActionText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   secondaryAction: { flex: 1, borderWidth: 1, borderColor: '#0d9488', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   secondaryActionText: { color: '#0d9488', fontWeight: '700', fontSize: 14 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#f3f4f6' },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827', marginBottom: 10 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 16 },
+  cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
+  seeAllLink: { fontSize: 12, fontWeight: '600', color: '#0d9488' },
   emptyText: { fontSize: 13, color: '#9ca3af' },
-  treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 },
-  treatmentCondition: { fontSize: 13, color: '#374151' },
+  treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  treatmentCondition: { fontSize: 13, color: '#374151', fontWeight: '600' },
+  treatmentRecheck: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  treatmentRecheckOverdue: { color: '#d97706', fontWeight: '600' },
   treatmentBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   treatmentBadgeText: { color: '#0d9488', fontSize: 11, fontWeight: '600' },
+  updateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  updateText: { flex: 1, fontSize: 13, color: '#6b7280' },
+  updateTextUnread: { color: '#1f2937', fontWeight: '600' },
+  updateDate: { fontSize: 11, color: '#9ca3af' },
 });

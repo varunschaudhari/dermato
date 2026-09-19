@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import {
   ScanFace, TrendingUp, CalendarClock, Gauge, ArrowUpRight, ArrowDownRight,
   ClipboardList, Bell, ChevronRight, Sparkles, AlertTriangle,
@@ -65,6 +66,23 @@ function getPriorityAlert({ plans, upcomingAppointment, notifications }) {
   }
 
   return null
+}
+
+// Last 8 visits' skin score, rendered as a plain line with no axes/tooltip —
+// a glance-able trend inside the hero, not a substitute for the full chart
+// on the Progress page (which ScoreTrend there already covers in depth).
+function HeroSparkline({ sessions }) {
+  const points = sessions.slice(-8).map((s) => ({ score: computeSkinScoreFromSession(s) })).filter((p) => p.score != null)
+  if (points.length < 2) return null
+  return (
+    <div className="h-10 w-24 sm:w-28 shrink-0 opacity-90">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={points}>
+          <Line type="monotone" dataKey="score" stroke="#fff" strokeWidth={2} dot={false} isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
 }
 
 function PriorityBanner({ alert }) {
@@ -189,6 +207,7 @@ export default function PatientHomePage() {
                   </div>
                   <span className="inline-block mt-2 text-xs font-semibold bg-white/15 rounded-full px-2.5 py-1">{meta.label}</span>
                 </div>
+                <HeroSparkline sessions={sessions} />
                 {delta != null && delta !== 0 && (
                   <div className={`flex items-center gap-1.5 text-sm font-medium ${delta > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
                     {delta > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
@@ -219,12 +238,23 @@ export default function PatientHomePage() {
                 <p className="text-sm text-gray-400 dark:text-gray-500">No active treatment plans right now.</p>
               ) : (
                 <div className="space-y-2">
-                  {activePlans.map((p) => (
-                    <div key={p.id} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700 dark:text-gray-300">{CONDITION_LABELS[p.condition] || p.condition}</span>
-                      <Badge color="brand">{p.remedy_type}</Badge>
-                    </div>
-                  ))}
+                  {activePlans.map((p) => {
+                    const overdue = p.expected_recheck_at && new Date(p.expected_recheck_at) < new Date()
+                    return (
+                      <div key={p.id} className="flex items-center justify-between text-sm">
+                        <div>
+                          <span className="text-gray-700 dark:text-gray-300">{CONDITION_LABELS[p.condition] || p.condition}</span>
+                          {p.expected_recheck_at && (
+                            <p className={`text-xs mt-0.5 ${overdue ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                              {overdue ? 'Recheck overdue since ' : 'Recheck due '}
+                              {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            </p>
+                          )}
+                        </div>
+                        <Badge color="brand">{p.remedy_type}</Badge>
+                      </div>
+                    )
+                  })}
                   <Link
                     to={`/progress/${patientId}#treatment-plans`}
                     className="inline-flex items-center gap-1 text-xs text-brand-600 dark:text-brand-400 font-medium mt-1 hover:text-brand-800 dark:hover:text-brand-300"

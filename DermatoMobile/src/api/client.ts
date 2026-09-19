@@ -74,6 +74,22 @@ export const analyzeImage = (patientId: number, photo: { uri: string; type: stri
   });
 };
 
+// The web app gets "live" capture feedback by sampling the camera's own video
+// element client-side — not possible here, since launchCamera() hands off to
+// the OS camera app rather than an in-app view this app controls. This is the
+// mobile-shaped equivalent: check the photo the moment it's picked, before
+// the patient moves on to configure conditions or submit, instead of only
+// finding out after a full /analyze round-trip. Runs the exact same gate
+// /analyze itself uses (quality_gate.py) — just without the expensive
+// analyzers, so it's fast enough to feel immediate.
+export const checkPhotoQuality = (photo: { uri: string; type: string; name: string }) => {
+  const formData = new FormData();
+  formData.append('file', { uri: photo.uri, type: photo.type, name: photo.name } as any);
+  return api.post('/analysis/quality-check', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
 export interface SessionOut {
   id: number;
   patient_id: number;

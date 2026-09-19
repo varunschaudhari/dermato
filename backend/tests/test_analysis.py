@@ -76,3 +76,29 @@ def test_analyze_requires_existing_patient(client, auth_headers):
         "/api/analysis/analyze", files=files, data={"patient_id": 999999}, headers=auth_headers
     )
     assert res.status_code == 404
+
+
+def test_quality_check_passes_good_photo(client, auth_headers):
+    files = {"file": ("front.jpg", io.BytesIO(_fake_jpeg_bytes()), "image/jpeg")}
+    res = client.post("/api/analysis/quality-check", files=files, headers=auth_headers)
+    assert res.status_code == 200
+    assert res.json() == {"status": "ok"}
+
+
+def test_quality_check_rejects_low_resolution(client, auth_headers):
+    # Below quality_gate's 480px floor — deterministic regardless of color/blur,
+    # unlike the skin-tone/blur checks _fake_jpeg_bytes is tuned around.
+    image = np.full((100, 100, 3), (130, 150, 200), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", image)
+    assert ok
+    files = {"file": ("front.jpg", io.BytesIO(encoded.tobytes()), "image/jpeg")}
+    res = client.post("/api/analysis/quality-check", files=files, headers=auth_headers)
+    assert res.status_code == 422
+    assert res.json()["detail"]["reason"] == "low_resolution"
+
+
+def test_quality_check_does_not_require_patient_id(client, auth_headers):
+    """No patient_id, no DB writes — this is a stateless precheck, unlike /analyze."""
+    files = {"file": ("front.jpg", io.BytesIO(_fake_jpeg_bytes()), "image/jpeg")}
+    res = client.post("/api/analysis/quality-check", files=files, headers=auth_headers)
+    assert res.status_code == 200

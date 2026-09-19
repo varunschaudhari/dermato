@@ -56,6 +56,27 @@ def _save_upload(contents: bytes, original_filename: str) -> str:
     return filename
 
 
+@router.post("/quality-check")
+async def check_quality(file: UploadFile = File(...)):
+    """Runs just the quality gate against a single photo — no analyzers, no DB
+    writes, no patient_id — so the capture screen can flag a bad photo (blurry,
+    too dark, no skin in frame, ...) the moment it's taken, instead of the
+    patient only finding out after tapping Analyze and waiting for the full
+    pipeline. Reuses quality_gate.assess()'s exact 422 {reason, message} shape,
+    so both platforms can share one error-rendering code path for this and the
+    final /analyze call's own gate (which stays in place as the real backstop —
+    this is a same-checks preview, not a replacement).
+    """
+    contents = await _read_and_validate(file)
+    nparr = np.frombuffer(contents, np.uint8)
+    image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(status_code=400, detail="Could not decode image")
+
+    quality_gate.assess(image)
+    return {"status": "ok"}
+
+
 @router.post("/analyze")
 async def analyze_image(
     file: UploadFile = File(..., description="Front-facing photo — required, drives the analysis"),

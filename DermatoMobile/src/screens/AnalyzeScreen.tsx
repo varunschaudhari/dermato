@@ -4,8 +4,10 @@ import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-pick
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
-import { analyzeImage, getErrorMessage } from '../api/client';
+import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
 import { CONDITION_LABELS } from '../constants';
+
+type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
 
 const CONDITIONS = ['acne', 'pigmentation', 'wrinkle', 'pore'] as const;
 
@@ -16,6 +18,8 @@ type RootStackParamList = { MainTabs: undefined; Results: { result: any; selecte
 
 export default function AnalyzeScreen() {
   const [photo, setPhoto] = useState<Asset | null>(null);
+  const [qualityStatus, setQualityStatus] = useState<QualityStatus>('idle');
+  const [qualityMessage, setQualityMessage] = useState('');
   const [selected, setSelected] = useState<string[]>([...CONDITIONS]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,13 +30,43 @@ export default function AnalyzeScreen() {
     setSelected((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
   };
 
+  // Checks the photo the moment it's picked, not just when Analyze is finally
+  // tapped — see checkPhotoQuality's comment in api/client.ts for why this is
+  // a separate precheck call rather than the live-video feedback the web app
+  // gets. A network/timeout failure here is inconclusive, not a bad photo —
+  // don't block the patient over a flaky connection; the real /analyze call
+  // runs this exact same gate again anyway.
+  const runQualityCheck = async (asset: Asset) => {
+    setQualityStatus('checking');
+    setQualityMessage('');
+    try {
+      await checkPhotoQuality({ uri: asset.uri!, type: asset.type || 'image/jpeg', name: asset.fileName || 'photo.jpg' });
+      setQualityStatus('ok');
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      if (detail && typeof detail === 'object' && typeof detail.message === 'string') {
+        setQualityStatus('failed');
+        setQualityMessage(detail.message);
+      } else {
+        setQualityStatus('idle');
+      }
+    }
+  };
+
   const pickFrom = async (source: 'camera' | 'gallery') => {
     const result = source === 'camera' ? await launchCamera({ mediaType: 'photo', quality: 0.8 }) : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
-    if (result.assets?.[0]) setPhoto(result.assets[0]);
+    const asset = result.assets?.[0];
+    if (asset) {
+      setPhoto(asset);
+      runQualityCheck(asset);
+    }
   };
 
   const handleAnalyze = async () => {
-    if (!photo || !patientId) return;
+    // 'idle' here means the precheck itself was inconclusive (e.g. network
+    // hiccup), not that the photo failed — only a confirmed 'failed' or a
+    // check still in flight should block submission.
+    if (!photo || !patientId || qualityStatus === 'checking' || qualityStatus === 'failed') return;
     setLoading(true);
     setError('');
     try {
@@ -77,7 +111,24 @@ export default function AnalyzeScreen() {
         ) : (
           <Text style={styles.photoPlaceholder}>No photo selected</Text>
         )}
+        {qualityStatus === 'checking' && (
+          <View style={styles.qualityOverlay}>
+            <ActivityIndicator color="#fff" size="small" />
+            <Text style={styles.qualityOverlayText}>Checking photo quality…</Text>
+          </View>
+        )}
       </View>
+
+      {qualityStatus === 'ok' && (
+        <View style={styles.qualityOk}>
+          <Text style={styles.qualityOkText}>✓ Looks good</Text>
+        </View>
+      )}
+      {qualityStatus === 'failed' && (
+        <View style={styles.qualityFailed}>
+          <Text style={styles.qualityFailedText}>{qualityMessage}</Text>
+        </View>
+      )}
 
       <View style={styles.row}>
         <TouchableOpacity style={styles.secondaryButton} onPress={() => pickFrom('camera')}>
@@ -91,9 +142,13 @@ export default function AnalyzeScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={[styles.button, (!photo || selected.length === 0 || loading) && styles.buttonDisabled]}
+        style={[
+          styles.button,
+          (!photo || selected.length === 0 || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
+            styles.buttonDisabled,
+        ]}
         onPress={handleAnalyze}
-        disabled={!photo || selected.length === 0 || loading}
+        disabled={!photo || selected.length === 0 || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Image</Text>}
       </TouchableOpacity>
@@ -113,9 +168,15 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: '#ccfbf1', borderColor: '#0d9488' },
   chipText: { fontSize: 13, color: '#4b5563' },
   chipTextActive: { color: '#0d9488', fontWeight: '600' },
-  photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 16, overflow: 'hidden' },
+  photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 12, overflow: 'hidden', position: 'relative' },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   photoPlaceholder: { color: '#9ca3af', fontSize: 13 },
+  qualityOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10 },
+  qualityOverlayText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  qualityOk: { backgroundColor: '#f0fdfa', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12 },
+  qualityOkText: { color: '#0f766e', fontSize: 13, fontWeight: '600' },
+  qualityFailed: { backgroundColor: '#fef2f2', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12 },
+  qualityFailedText: { color: '#b91c1c', fontSize: 13, fontWeight: '500' },
   row: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   secondaryButton: { flex: 1, borderWidth: 1, borderColor: '#0d9488', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   secondaryButtonText: { color: '#0d9488', fontWeight: '600', fontSize: 13 },
