@@ -183,6 +183,18 @@ async def analyze_image(
             if skin_problems:
                 pig_sev = skin_problems["pigmentation"].severity
                 wrinkle_sev = skin_problems["wrinkle"].severity
+                # The pigmentation/wrinkle classifiers were bootstrap-trained on
+                # the classical formula's own output (see
+                # train_pigmentation_wrinkle_severity.py) from a dataset with
+                # zero "severe" examples of either condition -- they structurally
+                # cannot predict "severe". The classical WSI verdict is the only
+                # signal that can, so it wins whenever it says severe, same as
+                # the existing hard overrides in severity_classifier.py
+                # (nodules/cysts, >50% pigmented area).
+                if pig_result.severity == "severe":
+                    pig_sev = "severe"
+                if wrinkle_result.severity == "severe":
+                    wrinkle_sev = "severe"
                 if pig_sev != pig_result.severity:
                     flags["pigmentation"] = None
                 if wrinkle_sev != wrinkle_result.severity:

@@ -35,6 +35,9 @@ Run:
 import argparse
 import json
 import sys
+
+# Windows consoles default to cp1252, which chokes on the checkmark below.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 from pathlib import Path
 
 import cv2

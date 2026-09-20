@@ -4,8 +4,10 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { Home as HomeIcon, ScanFace, History as HistoryIcon, TrendingUp } from 'lucide-react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import AnalyzeScreen from './src/screens/AnalyzeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
@@ -17,8 +19,13 @@ import NotificationsScreen from './src/screens/NotificationsScreen';
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Plain-text tab bar — no icon library installed, and adding one just for
-// tab icons isn't worth another native-module rebuild cycle right now.
+const TAB_ICONS: Record<string, typeof HomeIcon> = {
+  Home: HomeIcon,
+  Analyze: ScanFace,
+  History: HistoryIcon,
+  Progress: TrendingUp,
+};
+
 function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   return <Text style={{ fontSize: 11, fontWeight: focused ? '700' : '500', color: focused ? '#0d9488' : '#9ca3af' }}>{label}</Text>;
 }
@@ -26,14 +33,15 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 function MainTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: '#0d9488',
         tabBarInactiveTintColor: '#9ca3af',
-        // No icon library installed — without this, bottom-tabs renders a
-        // default icon placeholder (shows as an empty glyph box).
-        tabBarIcon: () => null,
-      }}
+        tabBarIcon: ({ color, size }) => {
+          const Icon = TAB_ICONS[route.name];
+          return Icon ? <Icon color={color} size={size ?? 22} /> : null;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: ({ focused }) => <TabLabel label="Home" focused={focused} /> }} />
       <Tab.Screen name="Analyze" component={AnalyzeScreen} options={{ tabBarLabel: ({ focused }) => <TabLabel label="Analyze" focused={focused} /> }} />
@@ -64,7 +72,10 @@ function RootNavigator() {
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </>
       ) : (
-        <Stack.Screen name="Login" component={LoginScreen} />
+        <>
+          <Stack.Screen name="Login" component={LoginScreen} />
+          <Stack.Screen name="Register" component={RegisterScreen} />
+        </>
       )}
     </Stack.Navigator>
   );

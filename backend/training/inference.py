@@ -28,8 +28,16 @@ MODEL_DIR         = Path(__file__).parent.parent / "models"
 ACNE_DET_WEIGHTS  = MODEL_DIR / "acne_detection"  / "weights" / "weights" / "best.pt"
 SKIN_PROB_WEIGHTS = MODEL_DIR / "skin_problems"    / "weights" / "weights" / "best.pt"
 SEVERITY_WEIGHTS  = MODEL_DIR / "acne_severity"    / "best.pth"
+PIGMENTATION_SEV_WEIGHTS = MODEL_DIR / "pigmentation_severity" / "best.pth"
+WRINKLE_SEV_WEIGHTS      = MODEL_DIR / "wrinkle_severity"      / "best.pth"
 
 SEVERITY_LABELS = ["clear", "mild", "moderate", "severe"]
+# Bootstrap-trained on the classical formula's own verdict (see
+# train_pigmentation_wrinkle_severity.py) from a dataset with zero "severe"
+# examples of either condition -- 3 classes, not 4, and callers must not
+# trust a "severe" prediction from these two the way they can for acne
+# (they can never actually produce one; see the override in analysis.py).
+CONDITION_SEVERITY_LABELS = ["mild", "moderate", "severe"]
 
 SKIN_CLASS_IDX = {
     "Acne": 0, "Blackheads": 1, "Dark-Spots": 2, "Dry-Skin": 3,
@@ -73,6 +81,8 @@ class DermatoInference:
         self._acne_det    = None
         self._skin_prob   = None
         self._severity_clf = None
+        self._pigmentation_clf = None
+        self._wrinkle_clf = None
 
     def _load_models(self):
         if self._acne_det is None and ACNE_DET_WEIGHTS.exists():
@@ -89,6 +99,20 @@ class DermatoInference:
             model.eval()
             self._severity_clf = model
             print("Loaded severity classifier model")
+
+        if self._pigmentation_clf is None and PIGMENTATION_SEV_WEIGHTS.exists():
+            model = timm.create_model("efficientnet_b0", pretrained=False, num_classes=3)
+            model.load_state_dict(torch.load(str(PIGMENTATION_SEV_WEIGHTS), map_location="cpu"))
+            model.eval()
+            self._pigmentation_clf = model
+            print("Loaded pigmentation severity classifier model")
+
+        if self._wrinkle_clf is None and WRINKLE_SEV_WEIGHTS.exists():
+            model = timm.create_model("efficientnet_b0", pretrained=False, num_classes=3)
+            model.load_state_dict(torch.load(str(WRINKLE_SEV_WEIGHTS), map_location="cpu"))
+            model.eval()
+            self._wrinkle_clf = model
+            print("Loaded wrinkle severity classifier model")
 
     def analyze(self, image_bgr: np.ndarray) -> dict:
         self._load_models()
@@ -155,19 +179,29 @@ class DermatoInference:
                 pig_area += float(box_area)
         pig_pct = min((pig_area / img_area) * 100, 100.0) if img_area > 0 else 0
 
+        if self._pigmentation_clf:
+            pig_severity = self._classify_condition_severity(image_bgr, self._pigmentation_clf)
+        else:
+            pig_severity = _pigmentation_severity_from_area_pct(pig_pct)
+
+        if self._wrinkle_clf:
+            wrinkle_severity = self._classify_condition_severity(image_bgr, self._wrinkle_clf)
+        else:
+            wrinkle_severity = _severity_from_count(counts["Wrinkles"], thresholds=(2, 6))
+
         return {
             "detection_counts": counts,
             "detections": detections,
             "pigmentation": PigmentationResult(
                 dark_spot_count=counts["Dark-Spots"],
                 pigmented_area_pct=round(pig_pct, 2),
-                severity=_pigmentation_severity_from_area_pct(pig_pct),
+                severity=pig_severity,
             ),
             "wrinkle": WrinkleResult(
                 wrinkle_count=counts["Wrinkles"],
                 skin_redness_count=counts["Skin-Redness"],
                 pore_count=counts["Enlarged-Pores"],
-                severity=_severity_from_count(counts["Wrinkles"], thresholds=(2, 6)),
+                severity=wrinkle_severity,
             ),
         }
 
@@ -188,6 +222,15 @@ class DermatoInference:
             probs  = F.softmax(logits, dim=1)
             pred   = probs.argmax(1).item()
         return SEVERITY_LABELS[pred]
+
+    def _classify_condition_severity(self, image_bgr: np.ndarray, model) -> str:
+        pil = Image.fromarray(cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB))
+        tensor = _transform(pil).unsqueeze(0)
+        with torch.no_grad():
+            logits = model(tensor)
+            probs  = F.softmax(logits, dim=1)
+            pred   = probs.argmax(1).item()
+        return CONDITION_SEVERITY_LABELS[pred]
 
 
 def _normalized_box(label: str, boxes, index: int, img_w: int, img_h: int) -> dict:

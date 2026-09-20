@@ -7,7 +7,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // machine), or a device's real LAN IP for a physical phone on local dev.
 // Points at the app's current VPS (see DEPLOY.md) — migrated off the old
 // 72.61.231.178 box.
-const API_HOST = 'http://187.127.149.141:8081';
+// TEMP-TESTING: pointed at the old 72.61.231.178 box for live Phase-B QA
+// (only host this session has SSH/cleanup access to) — revert before done.
+const API_HOST = 'http://72.61.231.178:8081';
 const BASE_URL = `${API_HOST}/api`;
 
 // For building absolute URLs from the relative paths the backend returns
@@ -26,6 +28,18 @@ api.interceptors.request.use(async (config) => {
 
 export type Severity = 'mild' | 'moderate' | 'severe';
 
+export interface MlDetection {
+  label: string;
+  confidence: number;
+  box: [number, number, number, number];
+}
+
+export interface Overlays {
+  acne?: { box: [number, number, number, number] }[];
+  pigmentation?: { polygon: [number, number][] }[];
+  wrinkle?: { line: [number, number][] }[];
+}
+
 export interface AnalyzeResult {
   session_id: number;
   patient_id: number;
@@ -34,7 +48,14 @@ export interface AnalyzeResult {
   severity: Record<string, Severity>;
   wsi: Record<string, number | null>;
   flags: Record<string, string | null>;
+  previous_severity?: Record<string, Severity>;
   recommendations: Record<string, { type: string; examples: string[]; duration_weeks?: number; escalated?: boolean } | string>;
+  overlays?: Overlays;
+  ml_detections?: {
+    detections: MlDetection[];
+    acne_lesion_types?: Record<string, number>;
+    skin_problem_counts?: Record<string, number>;
+  } | null;
 }
 
 // FastAPI's `detail` field takes three different shapes depending on the
@@ -60,6 +81,16 @@ export const login = (email: string, password: string) => {
 };
 
 export const getMe = () => api.get('/auth/me');
+
+export interface RegisterPatientPayload {
+  email: string;
+  password: string;
+  full_name: string;
+  age: number;
+  skin_type: string;
+}
+
+export const registerPatient = (payload: RegisterPatientPayload) => api.post('/auth/register-patient', payload);
 
 // The backend always analyzes all four conditions server-side; condition
 // selection in this app is a display filter only (applied in ResultsScreen),

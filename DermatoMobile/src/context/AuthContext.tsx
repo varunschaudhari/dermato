@@ -8,6 +8,7 @@ interface AuthState {
   patientId: number | null;
   fullName: string | null;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (token: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -36,13 +37,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { data } = await loginApi(email, password);
-    await AsyncStorage.setItem('token', data.access_token);
-    setToken(data.access_token);
+  // Shared by both sign-in (after exchanging credentials for a token) and
+  // registration (which already gets a token back from register-patient) —
+  // stores it and hydrates the user's identity the same way either path.
+  const loginWithToken = async (accessToken: string) => {
+    await AsyncStorage.setItem('token', accessToken);
+    setToken(accessToken);
     const me = await getMe();
     setPatientId(me.data.patient_id ?? null);
     setFullName(me.data.full_name ?? null);
+  };
+
+  const login = async (email: string, password: string) => {
+    const { data } = await loginApi(email, password);
+    await loginWithToken(data.access_token);
   };
 
   const logout = async () => {
@@ -53,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ loading, token, patientId, fullName, login, logout }}>
+    <AuthContext.Provider value={{ loading, token, patientId, fullName, login, loginWithToken, logout }}>
       {children}
     </AuthContext.Provider>
   );
