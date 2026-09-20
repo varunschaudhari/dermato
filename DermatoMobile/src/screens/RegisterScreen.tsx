@@ -5,6 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { User, Mail, Lock, Calendar, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { registerPatient, getErrorMessage } from '../api/client';
+import { COLORS } from '../constants';
 
 type RootStackParamList = { Login: undefined; Register: undefined };
 
@@ -83,6 +84,7 @@ export default function RegisterScreen() {
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => setShowPassword((v) => !v)}
+            accessibilityRole="button"
             accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
           >
             {showPassword ? <EyeOff size={16} color="#9ca3af" /> : <Eye size={16} color="#9ca3af" />}
@@ -110,6 +112,9 @@ export default function RegisterScreen() {
                 key={t}
                 onPress={() => setForm({ ...form, skin_type: t })}
                 style={[styles.chip, active && styles.chipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={t}
               >
                 <Text style={[styles.chipText, active && styles.chipTextActive]}>{t}</Text>
               </TouchableOpacity>
@@ -117,11 +122,22 @@ export default function RegisterScreen() {
           })}
         </View>
 
-        <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSubmit}
+          disabled={loading}
+          accessibilityRole="button"
+          accessibilityLabel="Create account"
+        >
           {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Create account</Text>}
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.loginLink}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Login')}
+          style={styles.loginLink}
+          accessibilityRole="button"
+          accessibilityLabel="Sign in"
+        >
           <Text style={styles.loginLinkText}>
             Already have an account? <Text style={styles.loginLinkBold}>Sign in</Text>
           </Text>
@@ -134,10 +150,10 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#f9fafb' },
   container: { padding: 24, paddingTop: 48 },
-  logo: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#0d9488', alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  logo: { width: 56, height: 56, borderRadius: 16, backgroundColor: COLORS.teal, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
   logoText: { color: '#fff', fontSize: 28, fontWeight: '700' },
-  title: { fontSize: 24, fontWeight: '700', textAlign: 'center', color: '#111827' },
-  subtitle: { fontSize: 14, color: '#6b7280', textAlign: 'center', marginTop: 4, marginBottom: 24 },
+  title: { fontSize: 24, fontWeight: '700', textAlign: 'center', color: COLORS.heading },
+  subtitle: { fontSize: 14, color: COLORS.secondaryText, textAlign: 'center', marginTop: 4, marginBottom: 24 },
   label: { fontSize: 13, color: '#4b5563', marginBottom: 4 },
   inputWrapper: { position: 'relative', justifyContent: 'center', marginBottom: 16 },
   inputIcon: { position: 'absolute', left: 12, zIndex: 1 },
@@ -146,13 +162,13 @@ const styles = StyleSheet.create({
   toggleButton: { position: 'absolute', right: 10, padding: 4 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   chip: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#ccfbf1', borderColor: '#0d9488' },
+  chipActive: { backgroundColor: '#ccfbf1', borderColor: COLORS.teal },
   chipText: { fontSize: 13, color: '#4b5563' },
-  chipTextActive: { color: '#0d9488', fontWeight: '600' },
-  button: { backgroundColor: '#0d9488', borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+  chipTextActive: { color: COLORS.teal, fontWeight: '600' },
+  button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
   loginLink: { marginTop: 20, marginBottom: 20 },
-  loginLinkText: { textAlign: 'center', fontSize: 13, color: '#6b7280' },
-  loginLinkBold: { color: '#0d9488', fontWeight: '700' },
+  loginLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.secondaryText },
+  loginLinkBold: { color: COLORS.teal, fontWeight: '700' },
 });

@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { BRAND_TEAL, CONDITION_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
@@ -16,6 +17,7 @@ import Button from '../components/ui/Button'
 import MessageThread from '../components/ui/MessageThread'
 import Tabs from '../components/ui/Tabs'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import LastUpdated from '../components/ui/LastUpdated'
 
@@ -209,7 +211,7 @@ function ScoreTrend({ sessions }) {
           <XAxis dataKey="session" tick={{ fontSize: 11 }} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} width={30} />
           <Tooltip />
-          <Line type="monotone" dataKey="score" stroke="#0d9488" strokeWidth={2.5} dot={{ r: 3 }} />
+          <Line type="monotone" dataKey="score" stroke={BRAND_TEAL} strokeWidth={2.5} dot={{ r: 3 }} />
         </LineChart>
       </ResponsiveContainer>
     </Card>
@@ -264,7 +266,7 @@ function ShareProgressButton({ patient, sessions }) {
     const ctx = canvas.getContext('2d')
 
     const grad = ctx.createLinearGradient(0, 0, 1080, 1080)
-    grad.addColorStop(0, '#0d9488')
+    grad.addColorStop(0, BRAND_TEAL)
     grad.addColorStop(1, '#134e4a')
     ctx.fillStyle = grad
     ctx.fillRect(0, 0, 1080, 1080)
@@ -436,22 +438,35 @@ export default function ProgressPage() {
   const canEditHistory = canEditNotes || user.role === 'patient'
   const isAdmin = user.role === 'admin'
 
-  const { data: patient } = useQuery({
+  const { data: patient, isError: patientError, refetch: refetchPatient } = useQuery({
     queryKey: ['patient', patientId],
     queryFn: () => getPatient(patientId).then((r) => r.data),
   })
 
-  const { data: sessions = [], isLoading: sessionsLoading, dataUpdatedAt: sessionsUpdatedAt } = useQuery({
+  const {
+    data: sessions = [],
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    refetch: refetchSessions,
+    dataUpdatedAt: sessionsUpdatedAt,
+  } = useQuery({
     queryKey: ['sessions', patientId],
     queryFn: () => getPatientSessions(patientId).then((r) => r.data),
     refetchInterval: 30000,
   })
 
-  const { data: plans = [] } = useQuery({
+  const { data: plans = [], isError: plansError, refetch: refetchPlans } = useQuery({
     queryKey: ['treatment-plans', patientId],
     queryFn: () => getTreatmentPlans(patientId).then((r) => r.data),
     refetchInterval: 30000,
   })
+
+  const hasError = sessionsError || patientError || plansError
+  const retryAll = () => {
+    refetchSessions()
+    refetchPatient()
+    refetchPlans()
+  }
   const activeTreatmentCount = plans.filter((p) => p.status === 'active').length
 
   const [activeTab, setActiveTab] = useState(() => HASH_TAB[location.hash.slice(1)] || 'overview')
@@ -578,12 +593,13 @@ export default function ProgressPage() {
           <SkeletonCard lines={4} />
           <SkeletonCard lines={3} />
         </div>
+      ) : hasError ? (
+        <QueryError message="Couldn't load this patient's progress." onRetry={retryAll} />
       ) : (
         <>
           <SummaryStrip sessions={sessions} activeTreatmentCount={activeTreatmentCount} />
 
-          <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab} />
-
+          <Tabs tabs={TABS} active={activeTab} onChange={setActiveTab}>
           {activeTab === 'overview' && (
             sessions.length === 0 ? (
               <Card>
@@ -651,10 +667,10 @@ export default function ProgressPage() {
                       <Legend />
                       {/* Colors are the validated 4-slot categorical order (blue/orange/aqua/yellow) —
                           run through the colorblind-safety checker rather than picked by eye. */}
-                      <Line type="monotone" dataKey="acne" stroke="#eb6834" strokeWidth={2} />
-                      <Line type="monotone" dataKey="pigmentation" stroke="#eda100" strokeWidth={2} />
-                      <Line type="monotone" dataKey="wrinkle" stroke="#2a78d6" strokeWidth={2} />
-                      <Line type="monotone" dataKey="pore" stroke="#1baf7a" strokeWidth={2} />
+                      <Line type="monotone" dataKey="acne" stroke={CONDITION_COLORS.acne} strokeWidth={2} />
+                      <Line type="monotone" dataKey="pigmentation" stroke={CONDITION_COLORS.pigmentation} strokeWidth={2} />
+                      <Line type="monotone" dataKey="wrinkle" stroke={CONDITION_COLORS.wrinkle} strokeWidth={2} />
+                      <Line type="monotone" dataKey="pore" stroke={CONDITION_COLORS.pore} strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </Card>
@@ -739,6 +755,7 @@ export default function ProgressPage() {
               <MessageThread patientId={patientId} />
             </div>
           )}
+          </Tabs>
         </>
       )}
     </div>

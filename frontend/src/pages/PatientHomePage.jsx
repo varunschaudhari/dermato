@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { getPatient, getPatientSessions, getTreatmentPlans, getAppointments, getNotifications } from '../services/api'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
+import { BRAND_TEAL } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
@@ -17,6 +18,7 @@ import EmptyState from '../components/ui/EmptyState'
 import ScoreDial from '../components/ui/ScoreDial'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import LastUpdated from '../components/ui/LastUpdated'
+import QueryError from '../components/ui/QueryError'
 
 const CONDITION_LABELS = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' }
 
@@ -78,7 +80,7 @@ function HeroSparkline({ sessions }) {
     <div className="h-10 w-24 sm:w-28 shrink-0">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points}>
-          <Line type="monotone" dataKey="score" stroke="#14b8a6" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="score" stroke={BRAND_TEAL} strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -95,7 +97,7 @@ export default function PatientHomePage() {
     enabled: !!patientId,
   })
 
-  const { data: sessions = [], isLoading: sessionsLoading, dataUpdatedAt: sessionsUpdatedAt } = useQuery({
+  const { data: sessions = [], isLoading: sessionsLoading, isError: sessionsError, refetch: refetchSessions, dataUpdatedAt: sessionsUpdatedAt } = useQuery({
     queryKey: ['sessions', String(patientId)],
     queryFn: () => getPatientSessions(patientId).then((r) => r.data),
     enabled: !!patientId,
@@ -164,6 +166,8 @@ export default function PatientHomePage() {
             <SkeletonCard lines={3} />
           </div>
         </div>
+      ) : sessionsError ? (
+        <QueryError message="Couldn't load your skin journey." onRetry={refetchSessions} />
       ) : (
         <>
           {sessions.length === 0 ? (

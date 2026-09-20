@@ -12,6 +12,7 @@ import FormField from '../components/ui/FormField'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import LastUpdated from '../components/ui/LastUpdated'
+import QueryError from '../components/ui/QueryError'
 
 const STATUS_META = {
   scheduled: { color: 'brand', icon: CalendarClock },
@@ -135,7 +136,7 @@ export default function AppointmentsPage() {
   const isPatient = user.role === 'patient'
   const isStaff = !isPatient
 
-  const { data: appointments = [], isLoading, dataUpdatedAt } = useQuery({
+  const { data: appointments = [], isLoading, isError, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['appointments'],
     queryFn: () => getAppointments().then((r) => r.data),
     refetchInterval: 30000,
@@ -212,6 +213,8 @@ export default function AppointmentsPage() {
           <SkeletonCard lines={3} />
           <SkeletonCard lines={3} />
         </>
+      ) : isError ? (
+        <QueryError message="Couldn't load appointments." onRetry={refetch} />
       ) : (
         <>
           <Card>

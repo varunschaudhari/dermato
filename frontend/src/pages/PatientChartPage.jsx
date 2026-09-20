@@ -6,6 +6,7 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 const CONDITION_LABELS = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' }
 
@@ -53,15 +54,7 @@ export default function PatientChartPage() {
   }
 
   if (isError || !patient) {
-    return (
-      <div className="max-w-md mx-auto text-center py-12">
-        <p className="text-gray-700 dark:text-gray-300 font-medium">Couldn't load this patient's chart.</p>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">It may not exist, or you may not have access to it.</p>
-        <Button variant="outline" className="mt-4" onClick={() => navigate(-1)} icon={ArrowLeft}>
-          Go back
-        </Button>
-      </div>
-    )
+    return <QueryError message="Couldn't load this patient's chart." />
   }
 
   const history = patient.skin_history || {}

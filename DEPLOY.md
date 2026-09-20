@@ -101,21 +101,27 @@ goes in:
 - **Rotate all credentials.** Generate a fresh `ADMIN_PASSWORD` and `SECRET_KEY`
   before anything beyond a private pilot — reissue if either was ever shared
   in chat, a screenshot, or a support ticket.
-- **Add database backups.** The Mongo container's data lives in a named
-  Docker volume on a single VPS with no automated backup — at minimum,
-  schedule a periodic `docker exec dermato-mongo-1 mongodump` to somewhere
-  off that server.
+- **Database backups — done, but local-only.** `scripts/backup_mongo.sh`
+  (deployed to `/opt/dermato/scripts/` by the normal CI/CD rsync) runs daily
+  at 03:00 via crontab on the VPS, dumping `mongodump --archive --gzip` to
+  `/var/backups/dermato-mongo/` (outside `/opt/dermato`, so a deploy's
+  `rsync --delete` can never touch it) and pruning anything older than 14
+  days. Still **all on the same VPS** — a disk failure takes out both the
+  live data and every backup. Copying these off-box (S3, Backblaze B2, even
+  another VPS) is the remaining gap.
 - **Move uploaded photos off the local disk to object storage** (S3,
   Cloudflare R2, Backblaze B2). `backend/uploads` is a bind mount on the VPS's
   local disk — fine for a pilot, but single point of failure with no
   off-site copy.
-- **Put the app behind HTTPS.** It's currently plain `http://` on a raw IP —
-  fine for an unlisted pilot URL, not for anything handling real health data.
-  A reverse proxy (Caddy, nginx + Let's Encrypt) or a domain + Cloudflare in
-  front of the VPS would cover this.
+- **HTTPS — done.** `dermato.cloud`/`www.dermato.cloud` front the app via
+  certbot-issued certs on the VPS's host nginx (auto-renews; see the note in
+  memory/deploy history if this needs revisiting — none of that nginx/certbot
+  config lives in this repo, it's server-only state like `.env`).
 - **This is still single-tenant.** Every user shares one database — fine for
   one clinic, not for multiple clinics with data that must stay separated.
   Revisit before onboarding a second organization.
-- **No automated tests cover `severity_classifier.py`** — one of the most
-  frequently rewritten modules in this codebase. Worth a regression suite
-  before this drives real treatment recommendations at scale.
+- **`severity_classifier.py` now has a regression suite**
+  (`tests/test_severity_classifier.py`) — but it only pins down today's
+  thresholds and overrides; it doesn't validate they're clinically correct
+  in the first place. Worth periodic review as the thresholds themselves
+  evolve.

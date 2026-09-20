@@ -7,6 +7,7 @@ import Card from '../components/ui/Card'
 import EmptyState from '../components/ui/EmptyState'
 import Badge from '../components/ui/Badge'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 function timeAgo(dateStr) {
   const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000)
@@ -20,7 +21,7 @@ function timeAgo(dateStr) {
 export default function MessagesInboxPage() {
   const navigate = useNavigate()
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['messages-inbox'],
     queryFn: () => getMessagesInbox().then((r) => r.data),
   })
@@ -35,6 +36,8 @@ export default function MessagesInboxPage() {
           <SkeletonCard lines={2} />
           <SkeletonCard lines={2} />
         </div>
+      ) : isError ? (
+        <QueryError message="Couldn't load your messages." onRetry={refetch} />
       ) : items.length === 0 ? (
         <Card>
           <EmptyState icon={Inbox} title="No patients yet" description="Messages with your patients will show up here." />
@@ -46,6 +49,10 @@ export default function MessagesInboxPage() {
               key={item.patient_id}
               className="p-4 cursor-pointer hover:shadow-md transition"
               onClick={() => navigate(`/progress/${item.patient_id}#messages`)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && navigate(`/progress/${item.patient_id}#messages`)}
+              aria-label={`Open conversation with ${item.patient_name}`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0 flex-1">

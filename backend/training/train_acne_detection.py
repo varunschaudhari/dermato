@@ -19,7 +19,7 @@ DATASET_YAML = Path(__file__).parent / "configs" / "acne_detection.yaml"
 OUTPUT_DIR   = Path(__file__).parent.parent / "models" / "acne_detection"
 
 
-def train(model_name: str, epochs: int, batch: int, imgsz: int, device: str):
+def train(model_name: str, epochs: int, batch: int, imgsz: int, device: str, output_dir: Path):
     model = YOLO(model_name)
 
     results = model.train(
@@ -28,7 +28,7 @@ def train(model_name: str, epochs: int, batch: int, imgsz: int, device: str):
         batch=batch,
         imgsz=imgsz,
         device=device,
-        project=str(OUTPUT_DIR),
+        project=str(output_dir),
         name="weights",
         exist_ok=True,
 
@@ -56,7 +56,7 @@ def train(model_name: str, epochs: int, batch: int, imgsz: int, device: str):
         verbose=True,
     )
 
-    print(f"\nBest model saved at: {OUTPUT_DIR}/weights/weights/best.pt")
+    print(f"\nBest model saved at: {output_dir}/weights/weights/best.pt")
     print(f"mAP50: {results.results_dict.get('metrics/mAP50(B)', 'N/A')}")
     print(f"mAP50-95: {results.results_dict.get('metrics/mAP50-95(B)', 'N/A')}")
 
@@ -82,9 +82,17 @@ if __name__ == "__main__":
                         help="cuda device (e.g. '0') or 'cpu'; auto-detects by default")
     parser.add_argument("--validate", action="store_true",    help="Run test evaluation only")
     parser.add_argument("--weights",  default=str(OUTPUT_DIR / "weights" / "weights" / "best.pt"))
+    # Defaults to a scratch directory, NOT the production models/acne_detection/
+    # folder that backend/training/inference.py actually loads -- a run here
+    # (especially a short test run) must never silently overwrite the
+    # currently-deployed best.pt. Pass --output-dir explicitly (pointed at
+    # OUTPUT_DIR) only once you've reviewed a run's metrics and deliberately
+    # want to promote it to production.
+    parser.add_argument("--output-dir", default=str(OUTPUT_DIR.parent / "acne_detection_retrain"),
+                        help=f"Where to write run outputs (default: a scratch dir, not {OUTPUT_DIR})")
     args = parser.parse_args()
 
     if args.validate:
         validate(args.weights)
     else:
-        train(args.model, args.epochs, args.batch, args.imgsz, args.device)
+        train(args.model, args.epochs, args.batch, args.imgsz, args.device, Path(args.output_dir))

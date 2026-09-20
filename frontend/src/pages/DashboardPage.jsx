@@ -6,12 +6,14 @@ import {
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { getAnalyticsSummary, getOverdueRecheck } from '../services/api'
+import { SEVERITY_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Badge from '../components/ui/Badge'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import AnimatedNumber from '../components/ui/AnimatedNumber'
 import LastUpdated from '../components/ui/LastUpdated'
+import QueryError from '../components/ui/QueryError'
 
 const STAT_CARDS = [
   { key: 'total_patients', label: 'Total Patients', icon: Users },
@@ -21,8 +23,6 @@ const STAT_CARDS = [
 ]
 
 const CONDITION_LABELS = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' }
-
-const SEVERITY_COLORS = { mild: '#22c55e', moderate: '#f59e0b', severe: '#ef4444' }
 
 const OUTCOME_META = {
   improved: { color: 'green', icon: ArrowDownRight, label: 'Improved' },
@@ -37,7 +37,7 @@ const PROGRESS_META = {
 }
 
 export default function DashboardPage() {
-  const { data, isLoading, dataUpdatedAt } = useQuery({
+  const { data, isLoading, isError, refetch, dataUpdatedAt } = useQuery({
     queryKey: ['analytics-summary'],
     queryFn: () => getAnalyticsSummary().then((r) => r.data),
     refetchInterval: 30000,
@@ -48,6 +48,15 @@ export default function DashboardPage() {
     queryFn: () => getOverdueRecheck().then((r) => r.data),
     refetchInterval: 30000,
   })
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Dashboard" subtitle="Practice overview" />
+        <QueryError message="Couldn't load the dashboard." onRetry={refetch} />
+      </div>
+    )
+  }
 
   if (isLoading || !data) {
     return (

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, TextInput, Dimensions, Share, LayoutAnimation } from 'react-native';
 import Svg, { Rect, Polygon, Polyline, Circle, Line as SvgLine } from 'react-native-svg';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,10 +17,22 @@ import {
   Stethoscope,
   ArrowUpCircle,
   Images,
+  CalendarClock,
+  StickyNote,
+  Share2,
 } from 'lucide-react-native';
-import { absoluteUrl, getPatientSessions, AnalyzeResult, SessionOut } from '../api/client';
+import {
+  absoluteUrl,
+  getPatientSessions,
+  getTreatmentPlans,
+  updatePatientNote,
+  AnalyzeResult,
+  SessionOut,
+  TreatmentPlanOut,
+} from '../api/client';
 import { computeSkinScoreFromSeverities, computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
-import { CONDITION_LABELS, SEVERITY_META } from '../constants';
+import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
+import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
 
 type RootStackParamList = { MainTabs: { screen: string } | undefined; Results: { result: AnalyzeResult; selected: string[] } };
 
@@ -115,6 +127,124 @@ function RadarChart({ data, size = 240 }: { data: { subject: string; value: numb
   );
 }
 
+// Same nudge as the web app's ResultsPage: surfaces the recheck date(s)
+// treatment_tracker.py already computed for the plan(s) this exact analysis
+// just created, right here at the moment of highest attention.
+function RecheckReminder({ plans, sessionId, conditionsShown }: { plans: TreatmentPlanOut[]; sessionId: number; conditionsShown: string[] }) {
+  const justCreated = plans.filter(
+    (p) => p.started_session_id === sessionId && p.expected_recheck_at && conditionsShown.includes(p.condition)
+  );
+  if (justCreated.length === 0) return null;
+
+  const firstDate = new Date(justCreated[0].expected_recheck_at as string).toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+  });
+
+  return (
+    <View style={[styles.alertBanner, styles.alertInfo]}>
+      <CalendarClock size={18} color="#0f766e" style={{ marginTop: 1 }} />
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.alertText, styles.alertTextInfo]}>
+          We'll check back with you around {firstDate} to see how things are progressing.
+        </Text>
+        {justCreated.length > 1 && (
+          <Text style={styles.alertFootnote}>
+            Rechecks scheduled:{' '}
+            {justCreated
+              .map(
+                (p) =>
+                  `${p.condition} on ${new Date(p.expected_recheck_at as string).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                  })}`
+              )
+              .join(', ')}
+            .
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+function PatientNoteCard({ sessionId }: { sessionId: number }) {
+  const [note, setNote] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updatePatientNote(sessionId, note);
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!editing && !note) {
+    return (
+      <View style={styles.card}>
+        <View style={styles.noteHeaderRow}>
+          <View style={styles.cardTitleRow}>
+            <StickyNote size={16} color="#0d9488" />
+            <Text style={styles.cardTitle}>My Notes</Text>
+          </View>
+          <TouchableOpacity onPress={() => setEditing(true)} accessibilityRole="button" accessibilityLabel="Add a note">
+            <Text style={styles.noteAction}>Add a note</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardTitleRow}>
+        <StickyNote size={16} color="#0d9488" />
+        <Text style={styles.cardTitle}>My Notes</Text>
+      </View>
+      {editing ? (
+        <View style={{ width: '100%', marginTop: 10 }}>
+          <TextInput
+            value={note}
+            onChangeText={setNote}
+            multiline
+            numberOfLines={3}
+            placeholder="e.g. Started a new moisturizer today"
+            style={styles.noteInput}
+          />
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
+            <TouchableOpacity
+              onPress={handleSave}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel={saving ? 'Saving note' : 'Save note'}
+            >
+              <Text style={styles.noteSave}>{saving ? 'Saving...' : 'Save'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setEditing(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel editing note"
+            >
+              <Text style={styles.noteCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.noteHeaderRow}>
+          <Text style={styles.noteText}>{note}</Text>
+          <TouchableOpacity onPress={() => setEditing(true)} accessibilityRole="button" accessibilityLabel="Edit note">
+            <Text style={styles.noteAction}>Edit</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -128,12 +258,17 @@ export default function ResultsScreen() {
   const [showDetails, setShowDetails] = useState(false);
   const [activeOverlays, setActiveOverlays] = useState<string[]>([]);
   const [sessions, setSessions] = useState<SessionOut[]>([]);
+  const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [showAfter, setShowAfter] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
-      getPatientSessions(patientId).then((r) => setSessions(r.data)).catch(() => {});
+      getPatientSessions(patientId)
+        .then((r) => setSessions(r.data))
+        .catch((err) => console.warn('Failed to load sessions/plans for results extras:', err));
+      getTreatmentPlans(patientId)
+        .then((r) => setPlans(r.data))
+        .catch((err) => console.warn('Failed to load sessions/plans for results extras:', err));
     }, [patientId])
   );
 
@@ -210,6 +345,8 @@ export default function ResultsScreen() {
         </View>
       </View>
 
+      <RecheckReminder plans={plans} sessionId={result.session_id} conditionsShown={Object.keys(severityToShow)} />
+
       {skinScore != null && (
         <View style={styles.hero}>
           <Text style={styles.heroLabel}>SKIN HEALTH SCORE</Text>
@@ -234,7 +371,12 @@ export default function ResultsScreen() {
       {imageUrl && (
         <View style={styles.card}>
           <View style={[styles.photoWrap, { height: renderedImageHeight }]}>
-            <Image source={{ uri: absoluteUrl(imageUrl) }} style={StyleSheet.absoluteFill} resizeMode="contain" />
+            <Image
+              source={{ uri: absoluteUrl(imageUrl) }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="contain"
+              accessibilityLabel="Analyzed photo with detected features"
+            />
             {detections.map((d, i) => {
               const cat = DETECTION_CATEGORY[d.label] ?? 'other';
               const color = CATEGORY_COLOR[cat];
@@ -312,6 +454,9 @@ export default function ResultsScreen() {
                       styles.overlayChip,
                       active ? { backgroundColor: OVERLAY_META[k].color, borderColor: OVERLAY_META[k].color } : null,
                     ]}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={OVERLAY_META[k].label}
                   >
                     <View style={[styles.overlayChipDot, { backgroundColor: active ? '#fff' : OVERLAY_META[k].color }]} />
                     <Text style={[styles.overlayChipText, active && { color: '#fff' }]}>
@@ -348,15 +493,13 @@ export default function ResultsScreen() {
             <Text style={styles.cardTitle}>Before &amp; After</Text>
           </View>
           <Text style={styles.cardSubtitle}>Tap the photo to compare your previous visit and today</Text>
-          <TouchableOpacity onPress={() => setShowAfter((v) => !v)} activeOpacity={0.85}>
-            <Image
-              source={{ uri: absoluteUrl(showAfter ? imageUrl : previousSession.image_url) }}
-              style={styles.compareImage}
-            />
-            <View style={styles.compareLabel}>
-              <Text style={styles.compareLabelText}>{showAfter ? 'Today' : 'Previous visit'}</Text>
-            </View>
-          </TouchableOpacity>
+          <BeforeAfterPhotoToggle
+            beforeUri={absoluteUrl(previousSession.image_url)}
+            afterUri={absoluteUrl(imageUrl)}
+            beforeLabel="Previous visit"
+            afterLabel="Today"
+            imageStyle={styles.compareImage}
+          />
         </View>
       )}
 
@@ -403,7 +546,16 @@ export default function ResultsScreen() {
 
       {mlDetections && (
         <View style={styles.card}>
-          <TouchableOpacity style={styles.detailsToggle} onPress={() => setShowDetails((v) => !v)}>
+          <TouchableOpacity
+            style={styles.detailsToggle}
+            onPress={() => {
+              LayoutAnimation.easeInEaseOut();
+              setShowDetails((v) => !v);
+            }}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: showDetails }}
+            accessibilityLabel={showDetails ? 'Hide detected features' : 'Show detected features'}
+          >
             <Text style={styles.cardTitle}>Detected Features</Text>
             {showDetails ? <ChevronUp size={18} color="#9ca3af" /> : <ChevronDown size={18} color="#9ca3af" />}
           </TouchableOpacity>
@@ -471,22 +623,41 @@ export default function ResultsScreen() {
         );
       })}
 
+      <PatientNoteCard sessionId={result.session_id} />
+
       <Text style={styles.disclaimer}>{(recommendations as any).disclaimer}</Text>
 
       <View style={styles.ctaRow}>
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Analyze' })}
+          accessibilityRole="button"
+          accessibilityLabel="New Analysis"
         >
           <Text style={styles.buttonText}>New Analysis</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Progress' })}
+          accessibilityRole="button"
+          accessibilityLabel="View Progress"
         >
           <Text style={styles.secondaryButtonText}>View Progress</Text>
         </TouchableOpacity>
       </View>
+      <TouchableOpacity
+        style={styles.shareButton}
+        onPress={() => {
+          const lines = Object.entries(severityToShow).map(([condition, level]) => `${condition}: ${level}`);
+          const message = `My Dermato skin analysis${skinScore != null ? ` — Skin Health Score ${skinScore}/100` : ''}\n${lines.join(', ')}`;
+          Share.share({ message }).catch(() => {});
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Share Result"
+      >
+        <Share2 size={15} color="#0d9488" />
+        <Text style={styles.shareButtonText}>Share Result</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -494,16 +665,16 @@ export default function ResultsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   modelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ccfbf1', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  modelBadgeText: { fontSize: 11, color: '#0d9488', fontWeight: '600' },
+  modelBadgeText: { fontSize: 11, color: COLORS.teal, fontWeight: '600' },
   alertBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, padding: 14, marginBottom: 16 },
   alertWarning: { backgroundColor: '#fffbeb' },
   alertInfo: { backgroundColor: '#f0fdfa' },
   alertText: { fontSize: 13, fontWeight: '500' },
   alertTextWarning: { color: '#92400e' },
   alertTextInfo: { color: '#0f766e' },
-  alertFootnote: { fontSize: 11, color: '#9ca3af', marginTop: 4, lineHeight: 15 },
+  alertFootnote: { fontSize: 11, color: COLORS.mutedGray, marginTop: 4, lineHeight: 15 },
   hero: { backgroundColor: '#0f766e', borderRadius: 16, padding: 20, marginBottom: 16 },
   heroLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   heroRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 6 },
@@ -513,57 +684,63 @@ const styles = StyleSheet.create({
   heroPill: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   heroPillText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   heroDelta: { fontSize: 12, fontWeight: '600' },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 16, alignItems: 'center' },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16, alignItems: 'center' },
   cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 4 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  cardSubtitle: { fontSize: 11, color: '#9ca3af', marginBottom: 12, alignSelf: 'flex-start' },
-  photoWrap: { width: '100%', borderRadius: 12, overflow: 'hidden', backgroundColor: '#e5e7eb' },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
+  cardSubtitle: { fontSize: 11, color: COLORS.mutedGray, marginBottom: 12, alignSelf: 'flex-start' },
+  photoWrap: { width: '100%', borderRadius: 12, overflow: 'hidden', backgroundColor: COLORS.divider },
   detectionChip: { position: 'absolute', top: -18, left: 0, paddingHorizontal: 4, paddingVertical: 1, borderRadius: 3 },
   detectionChipText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   overlayChipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  overlayChipsLabel: { fontSize: 11, color: '#9ca3af' },
-  overlayChip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  overlayChipsLabel: { fontSize: 11, color: COLORS.mutedGray },
+  overlayChip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderWidth: 1, borderColor: COLORS.divider, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   overlayChipDot: { width: 7, height: 7, borderRadius: 4 },
   overlayChipText: { fontSize: 11, fontWeight: '600', color: '#4b5563' },
-  detectionCount: { fontSize: 11, color: '#9ca3af', marginTop: 10 },
+  detectionCount: { fontSize: 11, color: COLORS.mutedGray, marginTop: 10 },
   legendRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 6 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
-  legendText: { fontSize: 11, color: '#6b7280' },
-  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: '#e5e7eb' },
-  compareLabel: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  compareLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  legendText: { fontSize: 11, color: COLORS.secondaryText },
+  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  severityCard: { flexBasis: '47%', flexGrow: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#f3f4f6' },
-  cardLabel: { fontSize: 12, color: '#6b7280', marginBottom: 6 },
+  severityCard: { flexBasis: '47%', flexGrow: 1, backgroundColor: '#fff', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: COLORS.border },
+  cardLabel: { fontSize: 12, color: COLORS.secondaryText, marginBottom: 6 },
   severityPill: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4 },
   severityPillText: { fontSize: 12, fontWeight: '700' },
-  wsi: { fontSize: 11, color: '#9ca3af' },
+  wsi: { fontSize: 11, color: COLORS.mutedGray },
   deltaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   deltaText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
   flag: { fontSize: 11, color: '#d97706', marginTop: 4 },
   radarLabel: { position: 'absolute', fontSize: 11, color: '#4b5563', fontWeight: '600' },
   detailsToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
-  subLabel: { fontSize: 12, fontWeight: '600', color: '#6b7280', marginBottom: 6 },
+  subLabel: { fontSize: 12, fontWeight: '600', color: COLORS.secondaryText, marginBottom: 6 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   brandBadge: { backgroundColor: '#ccfbf1', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
-  brandBadgeText: { fontSize: 11, color: '#0d9488', fontWeight: '600' },
-  grayBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#f3f4f6', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
+  brandBadgeText: { fontSize: 11, color: COLORS.teal, fontWeight: '600' },
+  grayBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.border, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   grayBadgeText: { fontSize: 11, color: '#4b5563', fontWeight: '600' },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111827', marginTop: 4, marginBottom: 10 },
-  recCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: '#f3f4f6' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.heading, marginTop: 4, marginBottom: 10 },
+  recCard: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   recHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4, flexWrap: 'wrap', gap: 6 },
-  recCondition: { fontWeight: '600', color: '#111827' },
+  recCondition: { fontWeight: '600', color: COLORS.heading },
   recBadgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   escalatedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#fef3c7', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
   escalatedBadgeText: { fontSize: 11, color: '#d97706', fontWeight: '600' },
   escalated: { fontSize: 11, color: '#d97706', marginBottom: 4 },
   recExample: { fontSize: 13, color: '#4b5563', marginTop: 2 },
-  duration: { fontSize: 11, color: '#9ca3af', marginTop: 6 },
-  disclaimer: { fontSize: 11, color: '#9ca3af', fontStyle: 'italic', marginTop: 12, marginBottom: 20 },
+  duration: { fontSize: 11, color: COLORS.mutedGray, marginTop: 6 },
+  disclaimer: { fontSize: 11, color: COLORS.mutedGray, fontStyle: 'italic', marginTop: 12, marginBottom: 20 },
   ctaRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
-  button: { flex: 1, backgroundColor: '#0d9488', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  button: { flex: 1, backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  secondaryButton: { flex: 1, borderWidth: 1, borderColor: '#0d9488', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  secondaryButtonText: { color: '#0d9488', fontWeight: '700', fontSize: 15 },
+  secondaryButton: { flex: 1, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  secondaryButtonText: { color: COLORS.teal, fontWeight: '700', fontSize: 15 },
+  noteHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' },
+  noteAction: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
+  noteInput: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 10, padding: 10, fontSize: 13, color: COLORS.heading, textAlignVertical: 'top', minHeight: 70 },
+  noteSave: { fontSize: 13, fontWeight: '700', color: COLORS.teal },
+  noteCancel: { fontSize: 13, fontWeight: '600', color: COLORS.mutedGray },
+  noteText: { flex: 1, fontSize: 13, color: '#4b5563', marginTop: 8 },
+  shareButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.divider, borderRadius: 10, paddingVertical: 12, marginBottom: 30 },
+  shareButtonText: { color: COLORS.teal, fontWeight: '600', fontSize: 13 },
 });

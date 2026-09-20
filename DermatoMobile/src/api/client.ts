@@ -5,11 +5,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // e.g. 'http://10.0.2.2:8000' for a local docker-compose backend reached from
 // the Android emulator (10.0.2.2 is the emulator's alias for the host
 // machine), or a device's real LAN IP for a physical phone on local dev.
-// Points at the app's current VPS (see DEPLOY.md) — migrated off the old
-// 72.61.231.178 box.
-// TEMP-TESTING: pointed at the old 72.61.231.178 box for live Phase-B QA
-// (only host this session has SSH/cleanup access to) — revert before done.
-const API_HOST = 'http://72.61.231.178:8081';
+// Points at the app's current production deployment (see DEPLOY.md) —
+// 72.61.231.178 was a prior VPS, since migrated off and its containers
+// stopped; it no longer serves anything.
+const API_HOST = 'https://dermato.cloud';
 const BASE_URL = `${API_HOST}/api`;
 
 // For building absolute URLs from the relative paths the backend returns
@@ -134,11 +133,13 @@ export interface SessionOut {
   pigmentation_wsi?: number | null;
   wrinkle_wsi?: number | null;
   doctor_note?: string | null;
+  patient_note?: string | null;
 }
 
 export interface TreatmentPlanOut {
   id: number;
   condition: string;
+  started_session_id: number;
   started_at: string;
   severity_at_start: Severity;
   remedy_type: string;
@@ -154,6 +155,9 @@ export const getPatientSessions = (patientId: number) =>
 
 export const getTreatmentPlans = (patientId: number) =>
   api.get<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`);
+
+export const updatePatientNote = (sessionId: number, note: string) =>
+  api.patch<SessionOut>(`/sessions/${sessionId}/patient-note`, { note });
 
 export interface SkinHistory {
   allergies?: string;

@@ -8,6 +8,8 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
+import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 const CONDITION_LABELS = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' }
 const SEVERITIES = ['mild', 'moderate', 'severe']
@@ -83,7 +85,7 @@ export default function AdminContentPage() {
   const qc = useQueryClient()
   const toast = useToast()
 
-  const { data: remedies = [] } = useQuery({
+  const { data: remedies = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['remedies'],
     queryFn: () => getRemedies().then((r) => r.data),
   })
@@ -105,7 +107,14 @@ export default function AdminContentPage() {
     <div className="space-y-6">
       <PageHeader title="Content" subtitle="Edit the remedy recommendations shown to patients." />
 
-      {remedies.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-4">
+          <SkeletonCard lines={5} />
+          <SkeletonCard lines={5} />
+        </div>
+      ) : isError ? (
+        <QueryError message="Couldn't load the remedy content." onRetry={refetch} />
+      ) : remedies.length === 0 ? (
         <Card>
           <EmptyState icon={FileEdit} title="No remedy content yet" description="Remedy content will appear here once loaded." />
         </Card>

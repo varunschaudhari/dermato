@@ -8,10 +8,13 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { getMessages, sendMessage, MessageOut } from '../api/client';
+import { COLORS } from '../constants';
+import ErrorState from '../components/ErrorState';
 
 export default function MessagesScreen() {
   const { patientId } = useAuth();
@@ -19,12 +22,22 @@ export default function MessagesScreen() {
   const [messages, setMessages] = useState<MessageOut[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const listRef = useRef<FlatList>(null);
 
   const load = useCallback(async () => {
     if (!patientId) return;
-    const { data } = await getMessages(patientId);
-    setMessages(data);
+    setLoading(true);
+    try {
+      const { data } = await getMessages(patientId);
+      setMessages(data);
+      setError('');
+    } catch {
+      setError("Couldn't load your messages.");
+    } finally {
+      setLoading(false);
+    }
   }, [patientId]);
 
   useFocusEffect(
@@ -57,40 +70,48 @@ export default function MessagesScreen() {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
           <Text style={styles.backLink}>‹ Back</Text>
         </TouchableOpacity>
       </View>
       <Text style={styles.title}>Messages</Text>
-      <FlatList
-        ref={listRef}
-        data={messages}
-        keyExtractor={(m) => String(m.id)}
-        contentContainerStyle={{ padding: 20, paddingTop: 8, flexGrow: 1 }}
-        onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>No messages yet — start the conversation with your dermatologist.</Text>
-        }
-        renderItem={({ item }) => {
-          const mine = item.sender_role === 'patient';
-          return (
-            <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
-              <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                {!mine && <Text style={styles.senderName}>{item.sender_name}</Text>}
-                <Text style={mine ? styles.bodyTextMine : styles.bodyText}>{item.body}</Text>
-                <Text style={mine ? styles.timeTextMine : styles.timeText}>
-                  {new Date(item.created_at).toLocaleString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                  })}
-                </Text>
+      {loading && messages.length === 0 ? (
+        <View style={styles.centerFill}>
+          <ActivityIndicator color={COLORS.teal} />
+        </View>
+      ) : error && messages.length === 0 ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={messages}
+          keyExtractor={(m) => String(m.id)}
+          contentContainerStyle={{ padding: 20, paddingTop: 8, flexGrow: 1 }}
+          onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>No messages yet — start the conversation with your dermatologist.</Text>
+          }
+          renderItem={({ item }) => {
+            const mine = item.sender_role === 'patient';
+            return (
+              <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
+                <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                  {!mine && <Text style={styles.senderName}>{item.sender_name}</Text>}
+                  <Text style={mine ? styles.bodyTextMine : styles.bodyText}>{item.body}</Text>
+                  <Text style={mine ? styles.timeTextMine : styles.timeText}>
+                    {new Date(item.created_at).toLocaleString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
               </View>
-            </View>
-          );
-        }}
-      />
+            );
+          }}
+        />
+      )}
       <View style={styles.inputRow}>
         <TextInput
           value={body}
@@ -103,6 +124,8 @@ export default function MessagesScreen() {
           style={[styles.sendButton, (!body.trim() || sending) && styles.sendButtonDisabled]}
           onPress={handleSend}
           disabled={!body.trim() || sending}
+          accessibilityRole="button"
+          accessibilityLabel={sending ? 'Sending message' : 'Send message'}
         >
           <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
@@ -114,19 +137,20 @@ export default function MessagesScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   headerRow: { paddingHorizontal: 20, paddingTop: 20 },
-  backLink: { fontSize: 14, fontWeight: '600', color: '#0d9488' },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827', paddingHorizontal: 20, marginTop: 6 },
-  emptyText: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 40 },
+  backLink: { fontSize: 14, fontWeight: '600', color: COLORS.teal },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, paddingHorizontal: 20, marginTop: 6 },
+  emptyText: { fontSize: 13, color: COLORS.mutedGray, textAlign: 'center', marginTop: 40 },
+  centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bubbleRow: { flexDirection: 'row', marginBottom: 10 },
   bubbleRowMine: { justifyContent: 'flex-end' },
   bubbleRowTheirs: { justifyContent: 'flex-start' },
   bubble: { maxWidth: '80%', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 9 },
-  bubbleMine: { backgroundColor: '#0d9488' },
-  bubbleTheirs: { backgroundColor: '#fff', borderWidth: 1, borderColor: '#f3f4f6' },
-  senderName: { fontSize: 11, fontWeight: '700', color: '#6b7280', marginBottom: 2 },
+  bubbleMine: { backgroundColor: COLORS.teal },
+  bubbleTheirs: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.border },
+  senderName: { fontSize: 11, fontWeight: '700', color: COLORS.secondaryText, marginBottom: 2 },
   bodyText: { fontSize: 14, color: '#1f2937' },
   bodyTextMine: { fontSize: 14, color: '#fff' },
-  timeText: { fontSize: 10, color: '#9ca3af', marginTop: 4 },
+  timeText: { fontSize: 10, color: COLORS.mutedGray, marginTop: 4 },
   timeTextMine: { fontSize: 10, color: 'rgba(255,255,255,0.7)', marginTop: 4 },
   inputRow: {
     flexDirection: 'row',
@@ -135,20 +159,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#f3f4f6',
+    borderTopColor: COLORS.border,
     backgroundColor: '#fff',
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: COLORS.divider,
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 10,
     fontSize: 14,
     maxHeight: 100,
   },
-  sendButton: { backgroundColor: '#0d9488', borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
+  sendButton: { backgroundColor: COLORS.teal, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 11 },
   sendButtonDisabled: { backgroundColor: '#99d5cf' },
   sendButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

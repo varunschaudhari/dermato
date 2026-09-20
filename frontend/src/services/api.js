@@ -66,6 +66,8 @@ export const assignDoctor = (patientId, doctorId) =>
 export const getPatientSessions = (patientId) => api.get(`/sessions/patient/${patientId}`)
 export const getSession = (sessionId) => api.get(`/sessions/${sessionId}`)
 export const updateDoctorNote = (sessionId, note) => api.patch(`/sessions/${sessionId}/note`, { note })
+
+export const updatePatientNote = (sessionId, note) => api.patch(`/sessions/${sessionId}/patient-note`, { note })
 export const getAnalyticsSummary = () => api.get('/analytics/summary')
 export const getTreatmentPlans = (patientId) => api.get(`/patients/${patientId}/treatment-plans`)
 export const updateSkinHistory = (patientId, data) => api.patch(`/patients/${patientId}/skin-history`, data)

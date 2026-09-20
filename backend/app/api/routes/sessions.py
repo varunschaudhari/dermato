@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.security import get_current_user, require_role
 from app.db.database import get_db, next_id, to_ns
-from app.schemas import DoctorNoteUpdate, SessionOut
+from app.schemas import DoctorNoteUpdate, PatientNoteUpdate, SessionOut
 
 router = APIRouter()
 
@@ -64,4 +64,27 @@ def update_doctor_note(
             }
         )
 
+    return to_ns(db.sessions.find_one({"_id": session_id}))
+
+
+@router.patch("/{session_id}/patient-note", response_model=SessionOut)
+def update_patient_note(
+    session_id: int,
+    payload: PatientNoteUpdate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """A patient's own private annotation on a scan (e.g. 'started a new
+    moisturizer today') — distinct from doctor_note, which only staff can
+    write. Patients can only note their own sessions; staff never write this
+    field, so no notification is fired here (contrast update_doctor_note,
+    which does notify — that's a clinician speaking to the patient; this is
+    the patient speaking to themselves)."""
+    session = db.sessions.find_one({"_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if current_user.role != "patient" or current_user.patient_id != session["patient_id"]:
+        raise HTTPException(status_code=403, detail="Not authorized to note this session")
+
+    db.sessions.update_one({"_id": session_id}, {"$set": {"patient_note": payload.note}})
     return to_ns(db.sessions.find_one({"_id": session_id}))

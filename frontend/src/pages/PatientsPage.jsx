@@ -11,6 +11,7 @@ import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import FormField from '../components/ui/FormField'
 
 function CreateAccountForm({ patient, onClose }) {
   const qc = useQueryClient()
@@ -232,18 +233,16 @@ export default function PatientsPage() {
       )}
 
       {showForm && (
-        <Card>
+        <Card className="animate-pop-in">
           <form onSubmit={handleSubmit} className="space-y-4">
             {['name', 'age', 'skin_type'].map((field) => (
-              <div key={field}>
-                <label className="block text-sm text-gray-600 dark:text-gray-400 capitalize mb-1">{field.replace('_', ' ')}</label>
-                <input
-                  className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-                  value={form[field]}
-                  onChange={(e) => setForm({ ...form, [field]: e.target.value })}
-                  required
-                />
-              </div>
+              <FormField
+                key={field}
+                label={field.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                value={form[field]}
+                onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+                required
+              />
             ))}
             <Button type="submit">Save Patient</Button>
           </form>
@@ -265,7 +264,14 @@ export default function PatientsPage() {
           {patients.map((p) => (
             <Card key={p.id} className="hover:shadow-md transition p-4">
               <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div className="cursor-pointer flex-1 min-w-0" onClick={() => navigate(`/progress/${p.id}`)}>
+                <div
+                  className="cursor-pointer flex-1 min-w-0"
+                  onClick={() => navigate(`/progress/${p.id}`)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/progress/${p.id}`)}
+                  aria-label={`View chart for ${p.name}`}
+                >
                   <p className="font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
                   <p className="text-sm text-gray-500 dark:text-gray-400">Age {p.age} · {p.skin_type}</p>
                 </div>

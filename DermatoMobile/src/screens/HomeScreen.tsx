@@ -14,7 +14,8 @@ import {
   NotificationOut,
 } from '../api/client';
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
-import { CONDITION_LABELS } from '../constants';
+import { CONDITION_LABELS, COLORS } from '../constants';
+import ErrorState from '../components/ErrorState';
 
 type TabParamList = { Home: undefined; Analyze: undefined; History: undefined; Progress: undefined };
 // Notifications lives in the root Stack (a sibling of MainTabs), same as
@@ -70,6 +71,7 @@ export default function HomeScreen() {
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [notifications, setNotifications] = useState<NotificationOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!patientId) return;
@@ -83,6 +85,9 @@ export default function HomeScreen() {
       setSessions(s.data);
       setPlans(p.data);
       setNotifications(n.data);
+      setError('');
+    } catch {
+      setError("Couldn't load your dashboard.");
     } finally {
       setLoading(false);
     }
@@ -121,117 +126,148 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>Here's where your skin journey stands today</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.bellButton} onPress={() => navigation.navigate('Notifications')}>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+            accessibilityLabel="Notifications"
+          >
             <Bell size={20} color="#374151" strokeWidth={2} />
             {unreadCount > 0 && <View style={styles.bellDot} />}
           </TouchableOpacity>
-          <TouchableOpacity onPress={logout}>
+          <TouchableOpacity onPress={logout} accessibilityRole="button" accessibilityLabel="Log out">
             <Text style={styles.logout}>Log out</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {priorityAlert && (
-        <TouchableOpacity
-          style={[styles.alertBanner, priorityAlert.kind === 'warning' ? styles.alertWarning : styles.alertInfo]}
-          onPress={handleAlertPress}
-          activeOpacity={0.85}
-        >
-          <Text style={[styles.alertText, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
-            {priorityAlert.message}
-          </Text>
-          <Text style={[styles.alertAction, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
-            {priorityAlert.actionLabel} →
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {latestSession ? (
-        <View style={styles.hero}>
-          <Text style={styles.heroLabel}>SKIN HEALTH SCORE</Text>
-          <View style={styles.heroRow}>
-            <Text style={styles.heroScore}>{score}</Text>
-            <Text style={styles.heroOutOf}>/ 100</Text>
-          </View>
-          <View style={styles.heroFooterRow}>
-            <View style={styles.heroPill}>
-              <Text style={styles.heroPillText}>{meta.label}</Text>
-            </View>
-            {delta != null && delta !== 0 && (
-              <Text style={[styles.heroDelta, { color: delta > 0 ? '#86efac' : '#fca5a5' }]}>
-                {delta > 0 ? '↑' : '↓'} {delta > 0 ? '+' : ''}{delta} since last visit
-              </Text>
-            )}
-          </View>
-          <TouchableOpacity onPress={() => navigation.navigate('Progress')}>
-            <Text style={styles.heroLink}>See full trend →</Text>
-          </TouchableOpacity>
-        </View>
+      {error && sessions.length === 0 && plans.length === 0 && notifications.length === 0 ? (
+        <ErrorState message={error} onRetry={load} />
       ) : (
-        <View style={styles.emptyHero}>
-          <Text style={styles.emptyHeroText}>Take your first photo to get your skin health score.</Text>
-        </View>
-      )}
-
-      <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.primaryAction} onPress={() => navigation.navigate('Analyze')}>
-          <Text style={styles.primaryActionText}>New Analysis</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryAction} onPress={() => navigation.navigate('Progress')}>
-          <Text style={styles.secondaryActionText}>View Progress</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Active Treatments</Text>
-        {activePlans.length === 0 ? (
-          <Text style={styles.emptyText}>No active treatment plans right now.</Text>
-        ) : (
-          activePlans.map((p) => {
-            const recheck = recheckLabel(p.expected_recheck_at);
-            return (
-              <View key={p.id} style={styles.treatmentRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.treatmentCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
-                  {recheck && (
-                    <Text style={[styles.treatmentRecheck, recheck.overdue && styles.treatmentRecheckOverdue]}>
-                      {recheck.text}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.treatmentBadge}>
-                  <Text style={styles.treatmentBadgeText}>{p.remedy_type}</Text>
-                </View>
-              </View>
-            );
-          })
-        )}
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.cardHeaderRow}>
-          <Text style={styles.cardTitle}>Recent Updates</Text>
-          {notifications.length > 0 && (
-            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-              <Text style={styles.seeAllLink}>See all</Text>
+        <>
+          {priorityAlert && (
+            <TouchableOpacity
+              style={[styles.alertBanner, priorityAlert.kind === 'warning' ? styles.alertWarning : styles.alertInfo]}
+              onPress={handleAlertPress}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={priorityAlert.message}
+            >
+              <Text style={[styles.alertText, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
+                {priorityAlert.message}
+              </Text>
+              <Text style={[styles.alertAction, priorityAlert.kind === 'warning' ? styles.alertTextWarning : styles.alertTextInfo]}>
+                {priorityAlert.actionLabel} →
+              </Text>
             </TouchableOpacity>
           )}
-        </View>
-        {notifications.length === 0 ? (
-          <Text style={styles.emptyText}>Nothing new — you're all caught up.</Text>
-        ) : (
-          notifications.slice(0, 3).map((n) => (
-            <View key={n.id} style={styles.updateRow}>
-              <Text style={[styles.updateText, !n.is_read && styles.updateTextUnread]} numberOfLines={2}>
-                {n.message}
-              </Text>
-              <Text style={styles.updateDate}>
-                {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-              </Text>
+
+          {latestSession ? (
+            <View style={styles.hero}>
+              <Text style={styles.heroLabel}>SKIN HEALTH SCORE</Text>
+              <View style={styles.heroRow}>
+                <Text style={styles.heroScore}>{score}</Text>
+                <Text style={styles.heroOutOf}>/ 100</Text>
+              </View>
+              <View style={styles.heroFooterRow}>
+                <View style={styles.heroPill}>
+                  <Text style={styles.heroPillText}>{meta.label}</Text>
+                </View>
+                {delta != null && delta !== 0 && (
+                  <Text style={[styles.heroDelta, { color: delta > 0 ? '#86efac' : '#fca5a5' }]}>
+                    {delta > 0 ? '↑' : '↓'} {delta > 0 ? '+' : ''}{delta} since last visit
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('Progress')}
+                accessibilityRole="button"
+                accessibilityLabel="See full trend"
+              >
+                <Text style={styles.heroLink}>See full trend →</Text>
+              </TouchableOpacity>
             </View>
-          ))
-        )}
-      </View>
+          ) : (
+            <View style={styles.emptyHero}>
+              <Text style={styles.emptyHeroText}>Take your first photo to get your skin health score.</Text>
+            </View>
+          )}
+
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={styles.primaryAction}
+              onPress={() => navigation.navigate('Analyze')}
+              accessibilityRole="button"
+              accessibilityLabel="New Analysis"
+            >
+              <Text style={styles.primaryActionText}>New Analysis</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryAction}
+              onPress={() => navigation.navigate('Progress')}
+              accessibilityRole="button"
+              accessibilityLabel="View Progress"
+            >
+              <Text style={styles.secondaryActionText}>View Progress</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Active Treatments</Text>
+            {activePlans.length === 0 ? (
+              <Text style={styles.emptyText}>No active treatment plans right now.</Text>
+            ) : (
+              activePlans.map((p) => {
+                const recheck = recheckLabel(p.expected_recheck_at);
+                return (
+                  <View key={p.id} style={styles.treatmentRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.treatmentCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
+                      {recheck && (
+                        <Text style={[styles.treatmentRecheck, recheck.overdue && styles.treatmentRecheckOverdue]}>
+                          {recheck.text}
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.treatmentBadge}>
+                      <Text style={styles.treatmentBadgeText}>{p.remedy_type}</Text>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </View>
+
+          <View style={styles.card}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.cardTitle}>Recent Updates</Text>
+              {notifications.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Notifications')}
+                  accessibilityRole="button"
+                  accessibilityLabel="See all notifications"
+                >
+                  <Text style={styles.seeAllLink}>See all</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {notifications.length === 0 ? (
+              <Text style={styles.emptyText}>Nothing new — you're all caught up.</Text>
+            ) : (
+              notifications.slice(0, 3).map((n) => (
+                <View key={n.id} style={styles.updateRow}>
+                  <Text style={[styles.updateText, !n.is_read && styles.updateTextUnread]} numberOfLines={2}>
+                    {n.message}
+                  </Text>
+                  <Text style={styles.updateDate}>
+                    {new Date(n.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </Text>
+                </View>
+              ))
+            )}
+          </View>
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -239,8 +275,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 2 },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
+  subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   bellButton: { padding: 2 },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
@@ -262,26 +298,26 @@ const styles = StyleSheet.create({
   heroPillText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   heroDelta: { fontSize: 12, fontWeight: '600' },
   heroLink: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontWeight: '600', marginTop: 12 },
-  emptyHero: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: '#e5e7eb' },
-  emptyHeroText: { color: '#6b7280', fontSize: 13 },
+  emptyHero: { backgroundColor: '#fff', borderRadius: 16, padding: 20, marginBottom: 16, borderWidth: 1, borderColor: COLORS.divider },
+  emptyHeroText: { color: COLORS.secondaryText, fontSize: 13 },
   actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  primaryAction: { flex: 1, backgroundColor: '#0d9488', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  primaryAction: { flex: 1, backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
   primaryActionText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  secondaryAction: { flex: 1, borderWidth: 1, borderColor: '#0d9488', borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
-  secondaryActionText: { color: '#0d9488', fontWeight: '700', fontSize: 14 },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#f3f4f6', marginBottom: 16 },
+  secondaryAction: { flex: 1, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center' },
+  secondaryActionText: { color: COLORS.teal, fontWeight: '700', fontSize: 14 },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: COLORS.border, marginBottom: 16 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  seeAllLink: { fontSize: 12, fontWeight: '600', color: '#0d9488' },
-  emptyText: { fontSize: 13, color: '#9ca3af' },
-  treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
+  seeAllLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
+  emptyText: { fontSize: 13, color: COLORS.mutedGray },
+  treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
   treatmentCondition: { fontSize: 13, color: '#374151', fontWeight: '600' },
-  treatmentRecheck: { fontSize: 11, color: '#9ca3af', marginTop: 2 },
+  treatmentRecheck: { fontSize: 11, color: COLORS.mutedGray, marginTop: 2 },
   treatmentRecheckOverdue: { color: '#d97706', fontWeight: '600' },
   treatmentBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  treatmentBadgeText: { color: '#0d9488', fontSize: 11, fontWeight: '600' },
-  updateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  updateText: { flex: 1, fontSize: 13, color: '#6b7280' },
+  treatmentBadgeText: { color: COLORS.teal, fontSize: 11, fontWeight: '600' },
+  updateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderTopColor: COLORS.border },
+  updateText: { flex: 1, fontSize: 13, color: COLORS.secondaryText },
   updateTextUnread: { color: '#1f2937', fontWeight: '600' },
-  updateDate: { fontSize: 11, color: '#9ca3af' },
+  updateDate: { fontSize: 11, color: COLORS.mutedGray },
 });

@@ -1,5 +1,5 @@
-import React, { useCallback, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, Image, Animated } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -13,7 +13,9 @@ import {
   TreatmentPlanOut,
   SkinHistory,
 } from '../api/client';
-import { CONDITION_LABELS } from '../constants';
+import { CONDITION_LABELS, COLORS } from '../constants';
+import ErrorState from '../components/ErrorState';
+import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
 
 type RootStackParamList = { Messages: undefined };
 
@@ -41,6 +43,7 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
     try {
       const { data } = await updateSkinHistory(patientId, form);
       onSaved(data.skin_history || form);
+      LayoutAnimation.easeInEaseOut();
       setEditing(false);
     } finally {
       setSaving(false);
@@ -52,7 +55,14 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
       <View style={styles.cardHeaderRow}>
         <Text style={styles.cardTitle}>Skin History</Text>
         {!editing && (
-          <TouchableOpacity onPress={() => setEditing(true)}>
+          <TouchableOpacity
+            onPress={() => {
+              LayoutAnimation.easeInEaseOut();
+              setEditing(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Edit skin history"
+          >
             <Text style={styles.editLink}>Edit</Text>
           </TouchableOpacity>
         )}
@@ -72,10 +82,24 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
             </View>
           ))}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleSave}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel={saving ? 'Saving skin history' : 'Save skin history'}
+            >
               <Text style={styles.saveButtonText}>{saving ? 'Saving...' : 'Save'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={() => setEditing(false)}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => {
+                LayoutAnimation.easeInEaseOut();
+                setEditing(false);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Cancel editing skin history"
+            >
               <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -97,30 +121,17 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
 }
 
 function BeforeAfterCard({ first, latest }: { first: SessionOut; latest: SessionOut }) {
-  const [showAfter, setShowAfter] = useState(true);
-  const fade = useRef(new Animated.Value(1)).current;
-
-  const toggle = () => {
-    Animated.timing(fade, { toValue: 0, duration: 120, useNativeDriver: true }).start(() => {
-      setShowAfter((v) => !v);
-      Animated.timing(fade, { toValue: 1, duration: 120, useNativeDriver: true }).start();
-    });
-  };
-
-  const shown = showAfter ? latest : first;
-
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Before &amp; After</Text>
       <Text style={styles.cardSubtitle}>Tap the photo to compare your first and most recent scan</Text>
-      <TouchableOpacity onPress={toggle} activeOpacity={0.85}>
-        <Animated.View style={{ opacity: fade }}>
-          <Image source={{ uri: absoluteUrl(shown.image_url) }} style={styles.compareImage} />
-        </Animated.View>
-        <View style={styles.compareLabel}>
-          <Text style={styles.compareLabelText}>{showAfter ? 'After (latest)' : 'Before (first)'}</Text>
-        </View>
-      </TouchableOpacity>
+      <BeforeAfterPhotoToggle
+        beforeUri={absoluteUrl(first.image_url)}
+        afterUri={absoluteUrl(latest.image_url)}
+        beforeLabel="Before (first)"
+        afterLabel="After (latest)"
+        imageStyle={styles.compareImage}
+      />
       <View style={styles.compareDateRow}>
         <Text style={styles.compareDateText}>{new Date(first.captured_at).toLocaleDateString()}</Text>
         <Text style={styles.compareDateText}>{new Date(latest.captured_at).toLocaleDateString()}</Text>
@@ -185,6 +196,7 @@ export default function ProgressScreen() {
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [skinHistory, setSkinHistory] = useState<SkinHistory | null | undefined>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!patientId) return;
@@ -198,6 +210,9 @@ export default function ProgressScreen() {
       setSessions(s.data);
       setPlans([...p.data].reverse());
       setSkinHistory(patient.data.skin_history);
+      setError('');
+    } catch {
+      setError("Couldn't load your progress.");
     } finally {
       setLoading(false);
     }
@@ -213,56 +228,66 @@ export default function ProgressScreen() {
     >
       <View style={styles.headerRow}>
         <Text style={styles.title}>Progress</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Messages')}>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Messages')}
+          accessibilityRole="button"
+          accessibilityLabel="Messages"
+        >
           <Text style={styles.messagesLink}>Messages</Text>
         </TouchableOpacity>
       </View>
 
-      {sessions.length === 0 ? (
-        <Text style={styles.emptyText}>No sessions recorded yet — run an analysis to start tracking.</Text>
+      {error && sessions.length === 0 && plans.length === 0 && !skinHistory ? (
+        <ErrorState message={error} onRetry={load} />
       ) : (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Severity Over Time</Text>
-          <Text style={styles.cardSubtitle}>Weighted Severity Index per visit — lower is better</Text>
-          <TrendTrack label={CONDITION_LABELS.acne} values={sessions.map((s) => s.acne_wsi ?? null)} />
-          <TrendTrack label={CONDITION_LABELS.pigmentation} values={sessions.map((s) => s.pigmentation_wsi ?? null)} />
-          <TrendTrack label={CONDITION_LABELS.wrinkle} values={sessions.map((s) => s.wrinkle_wsi ?? null)} />
-        </View>
-      )}
-
-      {sessions.length >= 2 && <BeforeAfterCard first={sessions[0]} latest={sessions[sessions.length - 1]} />}
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Treatment Plans</Text>
-        {plans.length === 0 ? (
-          <Text style={styles.emptyText}>No treatment plans yet.</Text>
-        ) : (
-          plans.map((p) => (
-            <View key={p.id} style={styles.planRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.planCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
-                <Text style={styles.planRemedy}>{p.remedy_type} · started {new Date(p.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
-                {p.status === 'active' && p.expected_recheck_at && (
-                  <Text style={styles.planRecheck}>
-                    {new Date(p.expected_recheck_at) < new Date() ? 'Recheck overdue since ' : 'Recheck due '}
-                    {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </Text>
-                )}
-              </View>
-              {p.status === 'active' ? (
-                <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>
-              ) : p.outcome ? (
-                <View style={[styles.outcomeBadge, { backgroundColor: `${OUTCOME_META[p.outcome].color}20` }]}>
-                  <Text style={[styles.outcomeBadgeText, { color: OUTCOME_META[p.outcome].color }]}>{OUTCOME_META[p.outcome].label}</Text>
-                </View>
-              ) : null}
+        <>
+          {sessions.length === 0 ? (
+            <Text style={styles.emptyText}>No sessions recorded yet — run an analysis to start tracking.</Text>
+          ) : (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Severity Over Time</Text>
+              <Text style={styles.cardSubtitle}>Weighted Severity Index per visit — lower is better</Text>
+              <TrendTrack label={CONDITION_LABELS.acne} values={sessions.map((s) => s.acne_wsi ?? null)} />
+              <TrendTrack label={CONDITION_LABELS.pigmentation} values={sessions.map((s) => s.pigmentation_wsi ?? null)} />
+              <TrendTrack label={CONDITION_LABELS.wrinkle} values={sessions.map((s) => s.wrinkle_wsi ?? null)} />
             </View>
-          ))
-        )}
-      </View>
+          )}
 
-      {patientId != null && (
-        <SkinHistoryCard patientId={patientId} history={skinHistory} onSaved={setSkinHistory} />
+          {sessions.length >= 2 && <BeforeAfterCard first={sessions[0]} latest={sessions[sessions.length - 1]} />}
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Treatment Plans</Text>
+            {plans.length === 0 ? (
+              <Text style={styles.emptyText}>No treatment plans yet.</Text>
+            ) : (
+              plans.map((p) => (
+                <View key={p.id} style={styles.planRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.planCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
+                    <Text style={styles.planRemedy}>{p.remedy_type} · started {new Date(p.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+                    {p.status === 'active' && p.expected_recheck_at && (
+                      <Text style={styles.planRecheck}>
+                        {new Date(p.expected_recheck_at) < new Date() ? 'Recheck overdue since ' : 'Recheck due '}
+                        {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </Text>
+                    )}
+                  </View>
+                  {p.status === 'active' ? (
+                    <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>
+                  ) : p.outcome ? (
+                    <View style={[styles.outcomeBadge, { backgroundColor: `${OUTCOME_META[p.outcome].color}20` }]}>
+                      <Text style={[styles.outcomeBadgeText, { color: OUTCOME_META[p.outcome].color }]}>{OUTCOME_META[p.outcome].label}</Text>
+                    </View>
+                  ) : null}
+                </View>
+              ))
+            )}
+          </View>
+
+          {patientId != null && (
+            <SkinHistoryCard patientId={patientId} history={skinHistory} onSaved={setSkinHistory} />
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -270,14 +295,14 @@ export default function ProgressScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827', marginBottom: 16 },
-  emptyText: { fontSize: 13, color: '#9ca3af' },
-  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#f3f4f6' },
-  cardTitle: { fontSize: 15, fontWeight: '700', color: '#111827' },
-  cardSubtitle: { fontSize: 11, color: '#9ca3af', marginBottom: 12 },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, marginBottom: 16 },
+  emptyText: { fontSize: 13, color: COLORS.mutedGray },
+  card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
+  cardSubtitle: { fontSize: 11, color: COLORS.mutedGray, marginBottom: 12 },
   trendBlock: { marginTop: 14 },
   trendLabel: { fontSize: 12, fontWeight: '600', color: '#374151', marginBottom: 4 },
-  track: { height: TRACK_HEIGHT, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f3f4f6' },
+  track: { height: TRACK_HEIGHT, borderRadius: 8, overflow: 'hidden', backgroundColor: COLORS.border },
   band: { position: 'absolute', left: 0, right: 0 },
   bandSevere: { top: 0, height: TRACK_HEIGHT / 3, backgroundColor: '#fee2e2' },
   bandModerate: { top: TRACK_HEIGHT / 3, height: TRACK_HEIGHT / 3, backgroundColor: '#fef3c7' },
@@ -285,31 +310,29 @@ const styles = StyleSheet.create({
   dotCol: { width: DOT_COL_WIDTH, height: TRACK_HEIGHT, alignItems: 'center' },
   dot: { position: 'absolute', width: 10, height: 10, borderRadius: 5, borderWidth: 2, borderColor: '#fff' },
   trendFooterRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  trendFooterText: { fontSize: 9, color: '#9ca3af' },
-  planRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
+  trendFooterText: { fontSize: 9, color: COLORS.mutedGray },
+  planRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
   planCondition: { fontSize: 13, fontWeight: '600', color: '#374151' },
-  planRemedy: { fontSize: 11, color: '#9ca3af', marginTop: 1 },
+  planRemedy: { fontSize: 11, color: COLORS.mutedGray, marginTop: 1 },
   planRecheck: { fontSize: 11, color: '#d97706', marginTop: 2, fontWeight: '600' },
   activeBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  activeBadgeText: { color: '#0d9488', fontSize: 11, fontWeight: '600' },
+  activeBadgeText: { color: COLORS.teal, fontSize: 11, fontWeight: '600' },
   outcomeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   outcomeBadgeText: { fontSize: 11, fontWeight: '600' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  messagesLink: { fontSize: 13, fontWeight: '600', color: '#0d9488' },
+  messagesLink: { fontSize: 13, fontWeight: '600', color: COLORS.teal },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  editLink: { fontSize: 12, fontWeight: '600', color: '#0d9488' },
-  fieldLabel: { fontSize: 11, color: '#6b7280', marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: '#e5e7eb', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#111827' },
-  saveButton: { backgroundColor: '#0d9488', borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  editLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
+  fieldLabel: { fontSize: 11, color: COLORS.secondaryText, marginBottom: 4 },
+  input: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: COLORS.heading },
+  saveButton: { backgroundColor: COLORS.teal, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   saveButtonText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   cancelButton: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  cancelButtonText: { color: '#6b7280', fontWeight: '600', fontSize: 12 },
-  historyRow: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: '#f3f4f6' },
-  historyLabel: { fontSize: 10, color: '#9ca3af' },
+  cancelButtonText: { color: COLORS.secondaryText, fontWeight: '600', fontSize: 12 },
+  historyRow: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border },
+  historyLabel: { fontSize: 10, color: COLORS.mutedGray },
   historyValue: { fontSize: 13, color: '#374151', marginTop: 1 },
-  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: '#e5e7eb' },
-  compareLabel: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
-  compareLabelText: { color: '#fff', fontSize: 11, fontWeight: '600' },
+  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider },
   compareDateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  compareDateText: { fontSize: 11, color: '#9ca3af' },
+  compareDateText: { fontSize: 11, color: COLORS.mutedGray },
 });

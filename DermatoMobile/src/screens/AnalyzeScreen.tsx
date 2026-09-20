@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
-import { CONDITION_LABELS } from '../constants';
+import { CONDITION_LABELS, COLORS } from '../constants';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
 
@@ -87,7 +87,7 @@ export default function AnalyzeScreen() {
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 20 }}>
       <View style={styles.headerRow}>
         <Text style={styles.title}>Skin Analysis</Text>
-        <TouchableOpacity onPress={logout}>
+        <TouchableOpacity onPress={logout} accessibilityRole="button" accessibilityLabel="Log out">
           <Text style={styles.logout}>Log out</Text>
         </TouchableOpacity>
       </View>
@@ -98,7 +98,14 @@ export default function AnalyzeScreen() {
         {CONDITIONS.map((c) => {
           const active = selected.includes(c);
           return (
-            <TouchableOpacity key={c} onPress={() => toggleCondition(c)} style={[styles.chip, active && styles.chipActive]}>
+            <TouchableOpacity
+              key={c}
+              onPress={() => toggleCondition(c)}
+              style={[styles.chip, active && styles.chipActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={CONDITION_LABELS[c]}
+            >
               <Text style={[styles.chipText, active && styles.chipTextActive]}>{CONDITION_LABELS[c]}</Text>
             </TouchableOpacity>
           );
@@ -107,7 +114,7 @@ export default function AnalyzeScreen() {
 
       <View style={styles.photoBox}>
         {photo ? (
-          <Image source={{ uri: photo.uri }} style={styles.photoPreview} />
+          <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel="Selected photo preview" />
         ) : (
           <Text style={styles.photoPlaceholder}>No photo selected</Text>
         )}
@@ -131,10 +138,20 @@ export default function AnalyzeScreen() {
       )}
 
       <View style={styles.row}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => pickFrom('camera')}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => pickFrom('camera')}
+          accessibilityRole="button"
+          accessibilityLabel="Take Photo"
+        >
           <Text style={styles.secondaryButtonText}>Take Photo</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => pickFrom('gallery')}>
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => pickFrom('gallery')}
+          accessibilityRole="button"
+          accessibilityLabel="Choose from Gallery"
+        >
           <Text style={styles.secondaryButtonText}>Choose from Gallery</Text>
         </TouchableOpacity>
       </View>
@@ -149,6 +166,8 @@ export default function AnalyzeScreen() {
         ]}
         onPress={handleAnalyze}
         disabled={!photo || selected.length === 0 || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+        accessibilityRole="button"
+        accessibilityLabel="Analyze Image"
       >
         {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Image</Text>}
       </TouchableOpacity>
@@ -159,18 +178,18 @@ export default function AnalyzeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827' },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
-  subtitle: { fontSize: 13, color: '#6b7280', marginTop: 4, marginBottom: 20 },
+  subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10 },
   chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   chip: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#ccfbf1', borderColor: '#0d9488' },
+  chipActive: { backgroundColor: '#ccfbf1', borderColor: COLORS.teal },
   chipText: { fontSize: 13, color: '#4b5563' },
-  chipTextActive: { color: '#0d9488', fontWeight: '600' },
+  chipTextActive: { color: COLORS.teal, fontWeight: '600' },
   photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 12, overflow: 'hidden', position: 'relative' },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
-  photoPlaceholder: { color: '#9ca3af', fontSize: 13 },
+  photoPlaceholder: { color: COLORS.mutedGray, fontSize: 13 },
   qualityOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 10 },
   qualityOverlayText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   qualityOk: { backgroundColor: '#f0fdfa', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12 },
@@ -178,9 +197,9 @@ const styles = StyleSheet.create({
   qualityFailed: { backgroundColor: '#fef2f2', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 12 },
   qualityFailedText: { color: '#b91c1c', fontSize: 13, fontWeight: '500' },
   row: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  secondaryButton: { flex: 1, borderWidth: 1, borderColor: '#0d9488', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  secondaryButtonText: { color: '#0d9488', fontWeight: '600', fontSize: 13 },
-  button: { backgroundColor: '#0d9488', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  secondaryButton: { flex: 1, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  secondaryButtonText: { color: COLORS.teal, fontWeight: '600', fontSize: 13 },
+  button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },

@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bell } from 'lucide-react'
 import { getNotifications, markNotificationRead } from '../../services/api'
 import { timeAgo } from '../../utils/timeAgo'
+import QueryError from './QueryError'
 
 export default function NotificationBell() {
   const navigate = useNavigate()
   const qc = useQueryClient()
   const [open, setOpen] = useState(false)
 
-  const { data: notifications = [] } = useQuery({
+  const { data: notifications = [], isError, refetch } = useQuery({
     queryKey: ['notifications'],
     queryFn: () => getNotifications().then((r) => r.data),
     refetchInterval: 60000,
@@ -50,7 +51,9 @@ export default function NotificationBell() {
             <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800 mb-1">
               <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">Notifications</p>
             </div>
-            {notifications.length === 0 ? (
+            {isError ? (
+              <QueryError message="Couldn't load notifications." onRetry={refetch} />
+            ) : notifications.length === 0 ? (
               <p className="px-3 py-4 text-sm text-gray-400 text-center">No notifications yet.</p>
             ) : (
               notifications.map((n) => (

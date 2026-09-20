@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { compressImage } from '../utils/compressImage'
 import { assessVideoFrame, qualityHint } from '../utils/photoQuality'
+import { CONDITION_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -21,10 +22,10 @@ import EmptyState from '../components/ui/EmptyState'
 // used everywhere else these conditions get charted — same order, run
 // through the colorblind-safety checker rather than picked by eye.
 const CONDITIONS = [
-  { key: 'acne', label: 'Acne', icon: Sparkles, color: '#eb6834' },
-  { key: 'wrinkle', label: 'Wrinkles', icon: Waves, color: '#2a78d6' },
-  { key: 'pigmentation', label: 'Pigmentation', icon: Palette, color: '#eda100' },
-  { key: 'pore', label: 'Pores', icon: CircleDot, color: '#1baf7a' },
+  { key: 'acne', label: 'Acne', icon: Sparkles, color: CONDITION_COLORS.acne },
+  { key: 'wrinkle', label: 'Wrinkles', icon: Waves, color: CONDITION_COLORS.wrinkle },
+  { key: 'pigmentation', label: 'Pigmentation', icon: Palette, color: CONDITION_COLORS.pigmentation },
+  { key: 'pore', label: 'Pores', icon: CircleDot, color: CONDITION_COLORS.pore },
 ]
 
 // Small tick-ruler motif — a measurement-instrument detail above each
@@ -542,7 +543,7 @@ export default function AnalyzePage() {
             className="fixed inset-0 z-40 bg-black/40"
             onClick={() => setShowCaptureChoice(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-lg sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:w-80 sm:p-5">
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-lg sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:w-80 sm:p-5 animate-pop-in">
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 text-center">
               Add {ANGLES.find((a) => a.key === activeAngle)?.label.toLowerCase()} photo
             </p>
@@ -737,7 +738,7 @@ export default function AnalyzePage() {
             className="fixed inset-0 z-40 bg-black/40"
             onClick={() => setShowReview(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-lg sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:w-96 sm:p-5">
+          <div className="fixed inset-x-0 bottom-0 z-50 bg-white dark:bg-gray-900 rounded-t-2xl p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-lg sm:inset-x-auto sm:bottom-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-2xl sm:w-96 sm:p-5 animate-pop-in">
             <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3 text-center">
               Review your photo
             </p>

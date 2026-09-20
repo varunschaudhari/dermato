@@ -8,11 +8,12 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 export default function ReportsPage() {
   const toast = useToast()
 
-  const { data: patients = [], isLoading } = useQuery({
+  const { data: patients = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['patients'],
     queryFn: () => getPatients().then((r) => r.data),
   })
@@ -43,6 +44,8 @@ export default function ReportsPage() {
           <SkeletonCard lines={2} />
           <SkeletonCard lines={2} />
         </div>
+      ) : isError ? (
+        <QueryError message="Couldn't load reports." onRetry={refetch} />
       ) : patients.length === 0 ? (
         <Card>
           <EmptyState icon={Users} title="No patients yet" description="Reports will be available once you have patients." />

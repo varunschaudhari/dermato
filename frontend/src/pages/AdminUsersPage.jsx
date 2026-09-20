@@ -8,6 +8,9 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
+import FormField from '../components/ui/FormField'
+import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 export default function AdminUsersPage() {
   const qc = useQueryClient()
@@ -16,7 +19,7 @@ export default function AdminUsersPage() {
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
 
-  const { data: users = [] } = useQuery({
+  const { data: users = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['users'],
     queryFn: () => listUsers().then((r) => r.data),
   })
@@ -62,53 +65,49 @@ export default function AdminUsersPage() {
         <Card>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Full name</label>
-              <input
-                required
-                value={form.full_name}
-                onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Email</label>
-              <input
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Password</label>
-              <input
-                type="password"
-                required
-                minLength={8}
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Role</label>
-              <select
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
-                className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
-              >
-                <option value="dermatologist">Dermatologist</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
+            <FormField
+              label="Full name"
+              required
+              value={form.full_name}
+              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            />
+            <FormField
+              label="Email"
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+            <FormField
+              label="Password"
+              type="password"
+              required
+              minLength={8}
+              value={form.password}
+              onChange={(e) => setForm({ ...form, password: e.target.value })}
+            />
+            <FormField
+              label="Role"
+              as="select"
+              value={form.role}
+              onChange={(e) => setForm({ ...form, role: e.target.value })}
+            >
+              <option value="dermatologist">Dermatologist</option>
+              <option value="admin">Admin</option>
+            </FormField>
             <Button type="submit">Create Account</Button>
           </form>
         </Card>
       )}
 
-      {users.length === 0 && !showForm ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          <SkeletonCard lines={2} />
+          <SkeletonCard lines={2} />
+        </div>
+      ) : isError ? (
+        <QueryError message="Couldn't load staff accounts." onRetry={refetch} />
+      ) : users.length === 0 && !showForm ? (
         <Card>
           <EmptyState icon={ShieldCheck} title="No staff accounts yet" description="Create the first dermatologist or admin account." />
         </Card>

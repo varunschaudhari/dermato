@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -8,6 +8,8 @@ import {
   markAllNotificationsRead,
   NotificationOut,
 } from '../api/client';
+import { COLORS } from '../constants';
+import ErrorState from '../components/ErrorState';
 
 type RootStackParamList = { MainTabs: { screen: string } | undefined };
 
@@ -36,12 +38,16 @@ export default function NotificationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [notifications, setNotifications] = useState<NotificationOut[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const { data } = await getNotifications();
       setNotifications(data);
+      setError('');
+    } catch {
+      setError("Couldn't load your notifications.");
     } finally {
       setLoading(false);
     }
@@ -53,6 +59,7 @@ export default function NotificationsScreen() {
 
   const handlePress = async (n: NotificationOut) => {
     if (!n.is_read) {
+      LayoutAnimation.easeInEaseOut();
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
       markNotificationRead(n.id).catch(() => {});
     }
@@ -61,6 +68,7 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAll = async () => {
+    LayoutAnimation.easeInEaseOut();
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
     markAllNotificationsRead().catch(() => {});
   };
@@ -68,37 +76,47 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
+        <TouchableOpacity onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Go back">
           <Text style={styles.backLink}>‹ Back</Text>
         </TouchableOpacity>
         {unreadCount > 0 && (
-          <TouchableOpacity onPress={handleMarkAll}>
+          <TouchableOpacity
+            onPress={handleMarkAll}
+            accessibilityRole="button"
+            accessibilityLabel="Mark all notifications as read"
+          >
             <Text style={styles.markAll}>Mark all read</Text>
           </TouchableOpacity>
         )}
       </View>
       <Text style={styles.title}>Notifications</Text>
-      <FlatList
-        data={notifications}
-        keyExtractor={(n) => String(n.id)}
-        contentContainerStyle={{ padding: 20, paddingTop: 8 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
-        ListEmptyComponent={
-          !loading ? <Text style={styles.emptyText}>You're all caught up — no notifications yet.</Text> : undefined
-        }
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.card, !item.is_read && styles.cardUnread]}
-            onPress={() => handlePress(item)}
-          >
-            {!item.is_read && <View style={styles.dot} />}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.message}>{item.message}</Text>
-              <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
+      {error && notifications.length === 0 ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : (
+        <FlatList
+          data={notifications}
+          keyExtractor={(n) => String(n.id)}
+          contentContainerStyle={{ padding: 20, paddingTop: 8 }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
+          ListEmptyComponent={
+            !loading ? <Text style={styles.emptyText}>You're all caught up — no notifications yet.</Text> : undefined
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.card, !item.is_read && styles.cardUnread]}
+              onPress={() => handlePress(item)}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.is_read ? '' : 'Unread: '}${item.message}`}
+            >
+              {!item.is_read && <View style={styles.dot} />}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.message}>{item.message}</Text>
+                <Text style={styles.time}>{timeAgo(item.created_at)}</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -112,10 +130,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
   },
-  title: { fontSize: 22, fontWeight: '700', color: '#111827', paddingHorizontal: 20, marginTop: 8 },
-  backLink: { fontSize: 14, fontWeight: '600', color: '#0d9488' },
-  markAll: { fontSize: 12, fontWeight: '600', color: '#0d9488' },
-  emptyText: { fontSize: 13, color: '#9ca3af', textAlign: 'center', marginTop: 40 },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, paddingHorizontal: 20, marginTop: 8 },
+  backLink: { fontSize: 14, fontWeight: '600', color: COLORS.teal },
+  markAll: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
+  emptyText: { fontSize: 13, color: COLORS.mutedGray, textAlign: 'center', marginTop: 40 },
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -125,10 +143,10 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#f3f4f6',
+    borderColor: COLORS.border,
   },
   cardUnread: { backgroundColor: '#f0fdfa', borderColor: '#99f6e4' },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#0d9488', marginTop: 5 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.teal, marginTop: 5 },
   message: { fontSize: 13, color: '#374151', lineHeight: 18 },
-  time: { fontSize: 11, color: '#9ca3af', marginTop: 4 },
+  time: { fontSize: 11, color: COLORS.mutedGray, marginTop: 4 },
 });

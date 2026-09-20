@@ -76,6 +76,7 @@ class SessionOut(BaseModel):
     ml_detections: Optional[dict] = None
     overlays: Optional[dict] = None
     doctor_note: Optional[str] = None
+    patient_note: Optional[str] = None
 
     @computed_field
     @property
@@ -98,6 +99,10 @@ class SessionOut(BaseModel):
 
 
 class DoctorNoteUpdate(BaseModel):
+    note: str
+
+
+class PatientNoteUpdate(BaseModel):
     note: str
 
 

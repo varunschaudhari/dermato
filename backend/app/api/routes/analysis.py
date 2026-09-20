@@ -259,6 +259,7 @@ async def analyze_image(
         "ml_detections": ml_detections,
         "overlays": overlays,
         "doctor_note": None,
+        "patient_note": None,
     }
     db.sessions.insert_one(session_doc)
     session = to_ns(session_doc)

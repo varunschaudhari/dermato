@@ -6,6 +6,8 @@ import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import Card from './Card'
 import Button from './Button'
+import { SkeletonLine } from './Skeleton'
+import QueryError from './QueryError'
 
 export default function MessageThread({ patientId }) {
   const { user } = useAuth()
@@ -13,7 +15,7 @@ export default function MessageThread({ patientId }) {
   const qc = useQueryClient()
   const [body, setBody] = useState('')
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['messages', patientId],
     queryFn: () => getMessages(patientId).then((r) => r.data),
     refetchInterval: 30000,
@@ -42,7 +44,15 @@ export default function MessageThread({ patientId }) {
       </h2>
 
       <div className="space-y-3 max-h-80 overflow-y-auto mb-4 pr-1">
-        {messages.length === 0 ? (
+        {isLoading ? (
+          <div className="space-y-2 py-1">
+            <SkeletonLine className="h-10 w-2/3" />
+            <SkeletonLine className="h-10 w-1/2 ml-auto" />
+            <SkeletonLine className="h-10 w-2/3" />
+          </div>
+        ) : isError ? (
+          <QueryError message="Couldn't load messages." onRetry={refetch} />
+        ) : messages.length === 0 ? (
           <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-4">
             No messages yet — start the conversation.
           </p>

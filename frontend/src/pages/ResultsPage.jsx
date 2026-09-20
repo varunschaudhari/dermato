@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
 import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from 'recharts'
-import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images } from 'lucide-react'
-import { getPatientSessions } from '../services/api'
+import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock } from 'lucide-react'
+import { getPatientSessions, getTreatmentPlans, updatePatientNote } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
+import { useToast } from '../context/ToastContext'
+import { BRAND_TEAL, DETECTION_COLORS } from '../lib/colors'
 import Card from '../components/ui/Card'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Alert from '../components/ui/Alert'
 import ClinicalFooter from '../components/ui/ClinicalFooter'
+import { SkeletonCard } from '../components/ui/Skeleton'
 
 const REC_TYPE_ICON = {
   'Home remedy': Home,
@@ -40,9 +43,9 @@ const DETECTION_CATEGORY = {
 // Classical-CV measurement overlays: acne lesion boxes, pigmented-patch
 // outlines, and wrinkle lines, plotted over the uploaded photo on demand.
 const OVERLAY_META = {
-  acne: { label: 'Acne', color: '#ef4444' },
-  pigmentation: { label: 'Pigmentation', color: '#a855f7' },
-  wrinkle: { label: 'Wrinkles', color: '#0ea5e9' },
+  acne: { label: 'Acne', color: DETECTION_COLORS.acne },
+  pigmentation: { label: 'Pigmentation', color: DETECTION_COLORS.pigmentation },
+  wrinkle: { label: 'Wrinkles', color: DETECTION_COLORS.wrinkle },
 }
 
 const CATEGORY_META = {
@@ -73,6 +76,129 @@ function TriageBanner({ severityToShow, recommendationsToShow }) {
   )
 }
 
+// Surfaces the recheck date(s) treatment_tracker.py already computed for the
+// plan(s) this exact analysis just created — at the moment of highest
+// attention, right after the result, rather than only discoverable later on
+// the Progress page.
+function RecheckReminder({ patientId, sessionId, conditionsShown }) {
+  const { data: plans = [] } = useQuery({
+    queryKey: ['treatment-plans', String(patientId)],
+    queryFn: () => getTreatmentPlans(patientId).then((r) => r.data),
+    enabled: !!patientId,
+  })
+
+  const justCreated = plans.filter(
+    (p) => p.started_session_id === sessionId && p.expected_recheck_at && conditionsShown.includes(p.condition)
+  )
+  if (justCreated.length === 0) return null
+
+  return (
+    <Alert
+      variant="info"
+      icon={CalendarClock}
+      title={`We'll check back with you around ${new Date(
+        justCreated[0].expected_recheck_at
+      ).toLocaleDateString(undefined, { month: 'long', day: 'numeric' })} to see how things are progressing.`}
+      footnote={
+        justCreated.length > 1
+          ? `Rechecks scheduled: ${justCreated
+              .map((p) => `${p.condition} on ${new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`)
+              .join(', ')}.`
+          : undefined
+      }
+    />
+  )
+}
+
+function PatientNoteCard({ sessionId, initialNote }) {
+  const qc = useQueryClient()
+  const toast = useToast()
+  const [note, setNote] = useState(initialNote || '')
+  const [editing, setEditing] = useState(false)
+
+  const mutation = useMutation({
+    mutationFn: () => updatePatientNote(sessionId, note),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sessions'] })
+      toast.success('Note saved.')
+      setEditing(false)
+    },
+    onError: () => toast.error('Could not save note.'),
+  })
+
+  if (!editing && !note) {
+    return (
+      <Card>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-brand-600" />
+            My Notes
+          </h2>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Add a note</Button>
+        </div>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2 flex items-center gap-2">
+        <StickyNote className="w-4 h-4 text-brand-600" />
+        My Notes
+      </h2>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            placeholder="e.g. Started a new moisturizer today"
+            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:border-brand-500"
+          />
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => mutation.mutate()} disabled={mutation.isPending}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">{note}</p>
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>Edit</Button>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function ShareResultButton({ skinScore, severityToShow }) {
+  const toast = useToast()
+
+  const handleShare = async () => {
+    const lines = Object.entries(severityToShow).map(([condition, level]) => `${condition}: ${level}`)
+    const text = `My Dermato skin analysis${skinScore != null ? ` — Skin Health Score ${skinScore}/100` : ''}\n${lines.join(', ')}`
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'My Dermato Result', text })
+      } catch {
+        // User cancelled the share sheet — not an error worth surfacing.
+      }
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(text)
+      toast.success('Result summary copied to clipboard.')
+    } catch {
+      toast.error('Could not copy the summary.')
+    }
+  }
+
+  return (
+    <Button variant="outline" icon={Share2} onClick={handleShare}>
+      Share Result
+    </Button>
+  )
+}
+
 export default function ResultsPage() {
   const { state } = useLocation()
   const navigate = useNavigate()
@@ -92,7 +218,7 @@ export default function ResultsPage() {
   // The just-created session is already the last entry here; the one before
   // it is this scan's "before" photo, so a returning patient sees whether
   // their treatment worked without navigating to Progress separately.
-  const { data: patientSessions = [] } = useQuery({
+  const { data: patientSessions = [], isLoading: patientSessionsLoading } = useQuery({
     queryKey: ['sessions', String(patientId)],
     queryFn: () => getPatientSessions(patientId).then((r) => r.data),
     enabled: !!patientId,
@@ -135,6 +261,10 @@ export default function ResultsPage() {
       </div>
 
       <TriageBanner severityToShow={severityToShow} recommendationsToShow={recommendationsToShow} />
+
+      {patientId && (
+        <RecheckReminder patientId={patientId} sessionId={sessionId} conditionsShown={Object.keys(severityToShow)} />
+      )}
 
       {/* Skin Health Score */}
       {skinScore != null && (
@@ -272,6 +402,8 @@ export default function ResultsPage() {
       )}
 
       {/* Before vs. After — how this scan compares to the previous one */}
+      {patientSessionsLoading && patientId && imageUrl && <SkeletonCard lines={2} />}
+
       {previousSession && imageUrl && (
         <Card>
           <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -325,7 +457,7 @@ export default function ResultsPage() {
           <RadarChart data={radarData}>
             <PolarGrid />
             <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
-            <Radar dataKey="value" stroke="#0d9488" fill="#0d9488" fillOpacity={0.4} />
+            <Radar dataKey="value" stroke={BRAND_TEAL} fill={BRAND_TEAL} fillOpacity={0.4} />
           </RadarChart>
         </ResponsiveContainer>
       </Card>
@@ -413,12 +545,15 @@ export default function ResultsPage() {
         })}
       </div>
 
+      {sessionId && <PatientNoteCard sessionId={sessionId} initialNote={state.results.patient_note} />}
+
       <ClinicalFooter modelPowered={modelPowered} disclaimer={recommendations.disclaimer} />
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={() => navigate('/')} icon={ScanFace}>
           New Analysis
         </Button>
+        <ShareResultButton skinScore={skinScore} severityToShow={severityToShow} />
         {sessionId && (
           <Button as={Link} to={`/report/${sessionId}`} variant="outline" icon={FileText}>
             View Report

@@ -8,12 +8,13 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
+import QueryError from '../components/ui/QueryError'
 
 export default function NotificationsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  const { data: notifications = [], isLoading } = useQuery({
+  const { data: notifications = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['notifications', 'full'],
     queryFn: () => getNotifications(200).then((r) => r.data),
   })
@@ -61,6 +62,8 @@ export default function NotificationsPage() {
           <SkeletonCard lines={2} />
           <SkeletonCard lines={2} />
         </div>
+      ) : isError ? (
+        <QueryError message="Couldn't load notifications." onRetry={refetch} />
       ) : notifications.length === 0 ? (
         <Card>
           <EmptyState icon={Bell} title="No notifications yet" description="You're all caught up." />
@@ -72,6 +75,10 @@ export default function NotificationsPage() {
               key={n.id}
               className={`p-4 flex items-start justify-between gap-3 ${n.link ? 'cursor-pointer hover:shadow-md transition' : ''}`}
               onClick={() => handleClick(n)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => e.key === 'Enter' && handleClick(n)}
+              aria-label={`View notification: ${n.message}`}
             >
               <div className="flex items-start gap-2.5 min-w-0">
                 {!n.is_read && <span className="w-2 h-2 rounded-full bg-brand-600 shrink-0 mt-1.5" />}
