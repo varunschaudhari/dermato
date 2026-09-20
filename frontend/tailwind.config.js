@@ -36,10 +36,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        // Display serif for page titles and hero headings only — body copy,
-        // labels, and anything numeric stays on Inter.
-        display: ['Fraunces', 'Georgia', 'serif'],
+        sans: ['"Instrument Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        // Data/instrument-readout face: dates, scores, tags, session codes —
+        // anything that reads like a lab measurement rather than prose.
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       keyframes: {
         fadeIn: {

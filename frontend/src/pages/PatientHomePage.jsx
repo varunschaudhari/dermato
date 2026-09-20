@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import {
-  ScanFace, TrendingUp, CalendarClock, Gauge, ArrowUpRight, ArrowDownRight,
+  ScanFace, TrendingUp, CalendarClock, ArrowUpRight, ArrowDownRight,
   ClipboardList, Bell, ChevronRight, Sparkles,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
@@ -14,8 +14,8 @@ import Badge from '../components/ui/Badge'
 import Button from '../components/ui/Button'
 import Alert from '../components/ui/Alert'
 import EmptyState from '../components/ui/EmptyState'
+import ScoreDial from '../components/ui/ScoreDial'
 import { SkeletonCard } from '../components/ui/Skeleton'
-import AnimatedNumber from '../components/ui/AnimatedNumber'
 import LastUpdated from '../components/ui/LastUpdated'
 
 const CONDITION_LABELS = { acne: 'Acne', pigmentation: 'Pigmentation', wrinkle: 'Wrinkles', pore: 'Pores' }
@@ -69,16 +69,16 @@ function getPriorityAlert({ plans, upcomingAppointment, notifications }) {
 }
 
 // Last 8 visits' skin score, rendered as a plain line with no axes/tooltip —
-// a glance-able trend inside the hero, not a substitute for the full chart
+// a glance-able trend beside the dial, not a substitute for the full chart
 // on the Progress page (which ScoreTrend there already covers in depth).
 function HeroSparkline({ sessions }) {
   const points = sessions.slice(-8).map((s) => ({ score: computeSkinScoreFromSession(s) })).filter((p) => p.score != null)
   if (points.length < 2) return null
   return (
-    <div className="h-10 w-24 sm:w-28 shrink-0 opacity-90">
+    <div className="h-10 w-24 sm:w-28 shrink-0">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points}>
-          <Line type="monotone" dataKey="score" stroke="#fff" strokeWidth={2} dot={false} isAnimationActive={false} />
+          <Line type="monotone" dataKey="score" stroke="#14b8a6" strokeWidth={2} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -175,35 +175,39 @@ export default function PatientHomePage() {
               />
             </Card>
           ) : (
-            <Card hero>
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1 flex items-center gap-1.5">
-                    <Gauge className="w-4 h-4" /> Skin Health Score
+            <Card>
+              <div className="flex items-center gap-5 sm:gap-6 flex-wrap">
+                <ScoreDial score={score} label={meta.label} labelClassName={meta.color} />
+                <div className="flex-1 min-w-[190px]">
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 mb-2">
+                    Skin Health Score
                   </p>
-                  <div className="flex items-baseline gap-2">
-                    <AnimatedNumber value={score} className="font-display text-5xl font-semibold tabular-nums" />
-                    <span className="text-sm text-white/60">/ 100</span>
+                  {delta != null && delta !== 0 && (
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full border ${
+                        delta > 0
+                          ? 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                          : 'text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+                      }`}
+                    >
+                      {delta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                      {delta > 0 ? '+' : ''}{delta} since last visit
+                    </span>
+                  )}
+                  <div className="mt-3">
+                    <HeroSparkline sessions={sessions} />
                   </div>
-                  <span className="inline-block mt-2 text-xs font-semibold bg-white/15 rounded-full px-2.5 py-1">{meta.label}</span>
+                  <Button
+                    as={Link}
+                    to={`/progress/${patientId}`}
+                    variant="ghost"
+                    size="sm"
+                    icon={ChevronRight}
+                    className="-ml-3 mt-1"
+                  >
+                    See full trend
+                  </Button>
                 </div>
-                <HeroSparkline sessions={sessions} />
-                {delta != null && delta !== 0 && (
-                  <div className={`flex items-center gap-1.5 text-sm font-medium ${delta > 0 ? 'text-emerald-300' : 'text-red-300'}`}>
-                    {delta > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                    {delta > 0 ? '+' : ''}{delta} since last visit
-                  </div>
-                )}
-                <Button
-                  as={Link}
-                  to={`/progress/${patientId}`}
-                  variant="ghost"
-                  size="sm"
-                  icon={ChevronRight}
-                  className="text-white/80 hover:bg-white/10 hover:text-white"
-                >
-                  See full trend
-                </Button>
               </div>
             </Card>
           )}

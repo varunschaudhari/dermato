@@ -46,6 +46,14 @@ backend/models/skin_problems/weights/weights/*
 backend/models/acne_severity/*
 !backend/models/acne_severity/best.pth
 
+!backend/models/pigmentation_severity/
+backend/models/pigmentation_severity/*
+!backend/models/pigmentation_severity/best.pth
+
+!backend/models/wrinkle_severity/
+backend/models/wrinkle_severity/*
+!backend/models/wrinkle_severity/best.pth
+
 # Node
 node_modules/
 dist/

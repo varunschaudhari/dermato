@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
 
 export default function LastUpdated({ timestamp, className = '' }) {
   const [, setTick] = useState(0)
@@ -17,9 +16,9 @@ export default function LastUpdated({ timestamp, className = '' }) {
   const label = seconds < 60 ? `${seconds}s ago` : `${Math.floor(seconds / 60)}m ago`
 
   return (
-    <span className={`inline-flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 ${className}`}>
-      <RefreshCw className="w-3 h-3" />
-      Updated {label}
+    <span className={`inline-flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-wide text-gray-400 dark:text-gray-500 ${className}`}>
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500" aria-hidden="true" />
+      Synced {label}
     </span>
   )
 }

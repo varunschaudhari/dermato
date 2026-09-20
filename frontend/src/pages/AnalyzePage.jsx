@@ -17,12 +17,44 @@ import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
 
+// Colors are the validated 4-slot categorical order (blue/orange/aqua/yellow)
+// used everywhere else these conditions get charted — same order, run
+// through the colorblind-safety checker rather than picked by eye.
 const CONDITIONS = [
-  { key: 'acne', label: 'Acne', icon: Sparkles },
-  { key: 'wrinkle', label: 'Wrinkles', icon: Waves },
-  { key: 'pigmentation', label: 'Pigmentation', icon: Palette },
-  { key: 'pore', label: 'Pores', icon: CircleDot },
+  { key: 'acne', label: 'Acne', icon: Sparkles, color: '#eb6834' },
+  { key: 'wrinkle', label: 'Wrinkles', icon: Waves, color: '#2a78d6' },
+  { key: 'pigmentation', label: 'Pigmentation', icon: Palette, color: '#eda100' },
+  { key: 'pore', label: 'Pores', icon: CircleDot, color: '#1baf7a' },
 ]
+
+// Small tick-ruler motif — a measurement-instrument detail above each
+// "how it works" step instead of a plain numbered marker.
+function StepRuler() {
+  return (
+    <div className="flex items-end justify-center gap-[3px] h-3" aria-hidden="true">
+      {Array.from({ length: 11 }).map((_, i) => (
+        <span
+          key={i}
+          className={`w-px bg-gray-300 dark:bg-gray-600 ${i % 5 === 0 ? 'h-full !bg-gray-400 dark:!bg-gray-500' : 'h-1.5'}`}
+        />
+      ))}
+    </div>
+  )
+}
+
+// Corner brackets around the upload icon — a dermatoscope-viewfinder detail
+// framing the empty capture state.
+function ViewfinderCorners() {
+  const base = 'absolute w-4 h-4 border-brand-500 dark:border-brand-400'
+  return (
+    <>
+      <span className={`${base} top-0 left-0 border-t-2 border-l-2 rounded-tl-md`} />
+      <span className={`${base} top-0 right-0 border-t-2 border-r-2 rounded-tr-md`} />
+      <span className={`${base} bottom-0 left-0 border-b-2 border-l-2 rounded-bl-md`} />
+      <span className={`${base} bottom-0 right-0 border-b-2 border-r-2 rounded-br-md`} />
+    </>
+  )
+}
 
 const HOW_IT_WORKS = [
   { icon: Camera, label: 'Capture', description: 'Take or upload a clear skin photo' },
@@ -340,7 +372,8 @@ export default function AnalyzePage() {
           <div className="grid grid-cols-3 gap-3">
             {HOW_IT_WORKS.map(({ icon: Icon, label, description }) => (
               <div key={label} className="text-center">
-                <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto mb-2 shadow-sm">
+                <StepRuler />
+                <div className="w-10 h-10 rounded-full bg-white dark:bg-gray-800 text-brand-600 dark:text-brand-400 flex items-center justify-center mx-auto my-2 shadow-sm">
                   <Icon className="w-5 h-5" />
                 </div>
                 <p className="text-xs font-semibold text-gray-800 dark:text-gray-100">{label}</p>
@@ -384,7 +417,7 @@ export default function AnalyzePage() {
         <Card className="mb-5">
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">What would you like checked?</label>
           <div className="grid grid-cols-2 gap-2.5">
-            {CONDITIONS.map(({ key, label, icon: Icon }) => {
+            {CONDITIONS.map(({ key, label, icon: Icon, color }) => {
               const active = selectedConditions.includes(key)
               return (
                 <button
@@ -392,9 +425,10 @@ export default function AnalyzePage() {
                   type="button"
                   onClick={() => toggleCondition(key)}
                   aria-pressed={active}
+                  style={active ? { borderColor: color, backgroundColor: `${color}17`, color } : undefined}
                   className={`flex items-center gap-2 text-sm rounded-xl px-3 py-2.5 border transition ${
                     active
-                      ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-medium'
+                      ? 'font-medium'
                       : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
                 >
@@ -442,8 +476,11 @@ export default function AnalyzePage() {
           </div>
         ) : (
           <div className="flex flex-col items-center gap-3 text-gray-500 dark:text-gray-400">
-            <div className="w-12 h-12 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center">
-              {isPatient ? <Camera className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
+            <div className="relative w-20 h-20 flex items-center justify-center">
+              <ViewfinderCorners />
+              <div className="w-12 h-12 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center">
+                {isPatient ? <Camera className="w-6 h-6" /> : <UploadCloud className="w-6 h-6" />}
+              </div>
             </div>
             <p className="text-sm">
               {isPatient

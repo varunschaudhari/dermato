@@ -207,8 +207,10 @@ def train(condition: str, epochs: int, batch: int, lr: float, device_str: str, r
         print("Not enough labeled images to train — aborting.")
         return
 
-    train_loader = DataLoader(train_ds, batch_size=batch, shuffle=True, num_workers=2, pin_memory=True)
-    val_loader = DataLoader(val_ds, batch_size=batch, shuffle=False, num_workers=2, pin_memory=True)
+    # num_workers=0 (main process only) -- 2 deadlocked reliably on Windows
+    # when two training runs' worker pools were spawned concurrently.
+    train_loader = DataLoader(train_ds, batch_size=batch, shuffle=True, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(val_ds, batch_size=batch, shuffle=False, num_workers=0, pin_memory=True)
 
     # Inverse-frequency class weights — the silver-label distribution isn't
     # known ahead of time (unlike acne's fixed, published ACNE04 counts), so
@@ -273,7 +275,7 @@ def evaluate(condition: str, weights_path: str, device_str: str):
 
     labels = build_silver_label_manifest(condition)
     val_ds = SilverLabeledDataset(condition, labels, get_transforms("val"), split="val")
-    val_loader = DataLoader(val_ds, batch_size=32, shuffle=False, num_workers=2)
+    val_loader = DataLoader(val_ds, batch_size=32, shuffle=False, num_workers=0)
 
     model = build_model(pretrained=False)
     model.load_state_dict(torch.load(weights_path, map_location=device))

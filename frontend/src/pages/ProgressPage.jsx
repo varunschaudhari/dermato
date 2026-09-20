@@ -493,6 +493,10 @@ export default function ProgressPage() {
     pore: bandScore(s.pore_severity),
   }))
 
+  const compareFirstScore = computeSkinScoreFromSession(sessions[sessions.length - 2])
+  const compareLastScore = computeSkinScoreFromSession(sessions[sessions.length - 1])
+  const compareDelta = compareFirstScore != null && compareLastScore != null ? compareLastScore - compareFirstScore : null
+
   const deleteMutation = useMutation({
     mutationFn: () => deletePatient(patientId),
     onSuccess: () => {
@@ -597,12 +601,29 @@ export default function ProgressPage() {
                       <Images className="w-5 h-5 text-brand-600" />
                       Before vs. After
                     </h2>
-                    <ReactCompareImage
-                      leftImage={sessions[sessions.length - 2].image_url}
-                      rightImage={sessions[sessions.length - 1].image_url}
-                      leftImageLabel="Previous visit"
-                      rightImageLabel="Latest visit"
-                    />
+                    <div className="relative">
+                      {compareDelta != null && compareDelta !== 0 && (
+                        <div
+                          className={`absolute -top-3.5 left-1/2 -translate-x-1/2 z-10 inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-bold px-3 py-1.5 rounded-full border shadow-sm bg-white dark:bg-gray-900 ${
+                            compareDelta > 0
+                              ? 'text-green-600 dark:text-green-400 border-green-500'
+                              : 'text-red-600 dark:text-red-400 border-red-500'
+                          }`}
+                        >
+                          {compareDelta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                          {compareDelta > 0 ? '+' : ''}{compareDelta} pts
+                          <span className="font-mono text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                            since previous visit
+                          </span>
+                        </div>
+                      )}
+                      <ReactCompareImage
+                        leftImage={sessions[sessions.length - 2].image_url}
+                        rightImage={sessions[sessions.length - 1].image_url}
+                        leftImageLabel="Previous visit"
+                        rightImageLabel="Latest visit"
+                      />
+                    </div>
                   </Card>
                 )}
               </>
@@ -628,10 +649,12 @@ export default function ProgressPage() {
                       <YAxis domain={[0, 1]} ticks={[0, 0.5, 1]} tickFormatter={(v) => ({ 0: 'Mild', 0.5: 'Moderate', 1: 'Severe' })[v]} tick={{ fontSize: 12 }} />
                       <Tooltip formatter={(value) => (value == null ? '—' : value.toFixed(2))} />
                       <Legend />
-                      <Line type="monotone" dataKey="acne" stroke="#0d9488" strokeWidth={2} />
-                      <Line type="monotone" dataKey="pigmentation" stroke="#8b5cf6" strokeWidth={2} />
-                      <Line type="monotone" dataKey="wrinkle" stroke="#f59e0b" strokeWidth={2} />
-                      <Line type="monotone" dataKey="pore" stroke="#0ea5e9" strokeWidth={2} />
+                      {/* Colors are the validated 4-slot categorical order (blue/orange/aqua/yellow) —
+                          run through the colorblind-safety checker rather than picked by eye. */}
+                      <Line type="monotone" dataKey="acne" stroke="#eb6834" strokeWidth={2} />
+                      <Line type="monotone" dataKey="pigmentation" stroke="#eda100" strokeWidth={2} />
+                      <Line type="monotone" dataKey="wrinkle" stroke="#2a78d6" strokeWidth={2} />
+                      <Line type="monotone" dataKey="pore" stroke="#1baf7a" strokeWidth={2} />
                     </LineChart>
                   </ResponsiveContainer>
                 </Card>

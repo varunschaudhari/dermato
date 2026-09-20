@@ -19,7 +19,7 @@ export const SEVERITY = {
 export default function Badge({ color = 'gray', icon: Icon, className = '', children }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full capitalize ${COLORS[color]} ${className}`}
+      className={`inline-flex items-center gap-1 font-mono text-[11px] font-medium tracking-wide px-2.5 py-1 rounded-full capitalize ${COLORS[color]} ${className}`}
     >
       {Icon && <Icon className="w-3.5 h-3.5" />}
       {children}

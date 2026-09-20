@@ -26,7 +26,7 @@ export default function Sidebar() {
           <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center shrink-0">
             <Stethoscope className="w-4.5 h-4.5 text-white" strokeWidth={2.2} />
           </div>
-          <span className="font-display text-xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Dermato</span>
+          <span className="text-xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Dermato</span>
         </div>
         <NotificationBell />
       </div>

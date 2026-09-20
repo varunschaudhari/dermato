@@ -26,7 +26,7 @@ export default function TopBar() {
           <div className="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center">
             <Stethoscope className="w-4 h-4 text-white" strokeWidth={2.2} />
           </div>
-          <span className="font-display text-lg font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Dermato</span>
+          <span className="text-lg font-semibold text-gray-900 dark:text-gray-100 tracking-tight">Dermato</span>
         </div>
 
         <div className="flex items-center gap-1">

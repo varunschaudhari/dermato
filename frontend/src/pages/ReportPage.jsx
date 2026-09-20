@@ -75,7 +75,7 @@ export default function ReportPage() {
             <Stethoscope className="w-5 h-5 text-white" strokeWidth={2.2} />
           </div>
           <div>
-            <p className="font-display text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100 print:!text-gray-900">Dermato Skin Analysis Report</p>
+            <p className="text-lg font-semibold tracking-tight text-gray-900 dark:text-gray-100 print:!text-gray-900">Dermato Skin Analysis Report</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 print:!text-gray-400">
               Generated {new Date().toLocaleDateString()} · Session captured {new Date(session.captured_at).toLocaleDateString()}
             </p>

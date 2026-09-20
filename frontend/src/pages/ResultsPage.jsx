@@ -128,7 +128,7 @@ export default function ResultsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Analysis Results</h1>
+        <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Analysis Results</h1>
         <Badge color={modelPowered ? 'brand' : 'gray'} icon={modelPowered ? Cpu : FlaskConical}>
           {modelPowered ? 'AI model-powered' : 'Classical CV'}
         </Badge>
@@ -142,7 +142,7 @@ export default function ResultsPage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-white/70 mb-1">Skin Health Score</p>
             <div className="flex items-baseline gap-2">
-              <span className="font-display text-5xl font-semibold tabular-nums">{skinScore}</span>
+              <span className="font-mono text-5xl font-semibold tabular-nums">{skinScore}</span>
               <span className="text-sm text-white/60">/ 100</span>
             </div>
             <span className="inline-block mt-2 text-xs font-semibold bg-white/15 rounded-full px-2.5 py-1">{scoreMetaInfo.label}</span>
