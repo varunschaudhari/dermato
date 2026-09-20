@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import {
   ScanFace, TrendingUp, CalendarClock, Gauge, ArrowUpRight, ArrowDownRight,
