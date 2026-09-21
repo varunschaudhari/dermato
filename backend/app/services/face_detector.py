@@ -38,6 +38,26 @@ def detect_and_calibrate(image: np.ndarray) -> Optional[FaceCalibration]:
     doesn't contain a whole face, and where a Haar cascade won't fire — this
     calibration only ever *adds* accuracy for wider portrait-style photos, it
     never overrides the tuned default for genuine close-ups.
+
+    KNOWN GAP (confirmed 2026-09-21, not yet fixed): for that exact no-face
+    close-up case, there is no real per-photo scale at all — the caller's
+    fallback default (`scale_cm_per_px=0.026` in acne_analyzer.py/
+    wrinkle_analyzer.py) has no documented basis. Checked every spec doc in
+    files/ and the app's own capture UI (web + DermatoMobile): neither
+    defines or enforces any capture distance, zoom level, or reference-object
+    calibration for the user. The only "fixed distance" concept anywhere in
+    this project describes an unbuilt, unrelated hardware device (a
+    Raspberry-Pi dermatoscope with a physical skin-contact spacer, in the
+    patent draft under files/) — not this phone-camera app. Concretely, this
+    makes wrinkle severity for close-up crops untrustworthy: a visibly severe
+    forehead close-up was graded "moderate" by the classical formula, and
+    across 930 test images from two datasets it never once produced "severe"
+    for wrinkles. Real fix needs one of: (a) define and actually show users a
+    capture protocol (e.g. "hold your phone 15cm from your skin") and use
+    that as this fallback's basis, or (b) add an in-frame reference object
+    (a coin, a card) the app can measure against for a real per-photo scale.
+    Until then, treat any wrinkle severity from a no-face photo as best-effort,
+    not calibrated.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = _face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))

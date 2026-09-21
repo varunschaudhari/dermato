@@ -125,3 +125,21 @@ goes in:
   thresholds and overrides; it doesn't validate they're clinically correct
   in the first place. Worth periodic review as the thresholds themselves
   evolve.
+- **Wrinkle severity is unreliable for close-up crops with no face in
+  frame** (this app's primary intended photo type). No documented capture
+  distance/zoom exists anywhere in this project for users to follow, so
+  `wrinkle_analyzer.py`'s fallback scale assumption has no real basis —
+  confirmed by testing: the classical formula never once produced "severe"
+  across 930 test images from two different datasets, including a visibly
+  severe forehead close-up. See the full writeup in
+  `face_detector.py`'s `detect_and_calibrate()` docstring. Both the
+  bootstrap `wrinkle_severity` model and the classical fallback inherit this
+  — fix needs either a real, enforced capture protocol or an in-frame
+  reference object for scale, not more training.
+- **Pigmentation/wrinkle severity classifiers have no clinical ground
+  truth.** `pigmentation_severity`/`wrinkle_severity` (`backend/models/`)
+  were bootstrap-trained to imitate the classical CV formula's own output
+  (see `backend/training/train_pigmentation_wrinkle_severity.py`), not
+  independently verified accuracy — and neither ever saw a real "severe"
+  example during training. A dermatologist-facing confirm/correct-severity
+  workflow would be the way to get real labels; doesn't exist yet.
