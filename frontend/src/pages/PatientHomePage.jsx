@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { getPatient, getPatientSessions, getTreatmentPlans, getAppointments, getNotifications } from '../services/api'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
+import { computeTreatmentProgress } from '../utils/treatmentProgress'
 import { BRAND_TEAL } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
@@ -228,18 +229,32 @@ export default function PatientHomePage() {
                 <div className="space-y-2">
                   {activePlans.map((p) => {
                     const overdue = p.expected_recheck_at && new Date(p.expected_recheck_at) < new Date()
+                    const progress = computeTreatmentProgress(p)
                     return (
-                      <div key={p.id} className="flex items-center justify-between text-sm">
-                        <div>
+                      <div key={p.id} className="text-sm">
+                        <div className="flex items-center justify-between">
                           <span className="text-gray-700 dark:text-gray-300">{CONDITION_LABELS[p.condition] || p.condition}</span>
-                          {p.expected_recheck_at && (
-                            <p className={`text-xs mt-0.5 ${overdue ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
-                              {overdue ? 'Recheck overdue since ' : 'Recheck due '}
-                              {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                            </p>
-                          )}
+                          <Badge color="brand">{p.remedy_type}</Badge>
                         </div>
-                        <Badge color="brand">{p.remedy_type}</Badge>
+                        {p.expected_recheck_at && (
+                          <p className={`text-xs mt-0.5 ${overdue ? 'text-amber-600 dark:text-amber-400 font-medium' : 'text-gray-400 dark:text-gray-500'}`}>
+                            {overdue ? 'Recheck overdue since ' : 'Recheck due '}
+                            {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </p>
+                        )}
+                        {progress && (
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-brand-500"
+                                style={{ width: `${progress.pct}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] text-gray-400 dark:text-gray-500 shrink-0">
+                              Day {progress.elapsedDays} of {progress.totalDays}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )
                   })}

@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
-import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock } from 'lucide-react'
+import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock, Sparkles, Waves, Palette, CircleDot } from 'lucide-react'
 import { getPatientSessions, getTreatmentPlans, updatePatientNote } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
+import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
-import { DETECTION_COLORS } from '../lib/colors'
+import { DETECTION_COLORS, CONDITION_COLORS } from '../lib/colors'
 import Card from '../components/ui/Card'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -19,6 +20,16 @@ const REC_TYPE_ICON = {
   'OTC Cosmeceutical': Pill,
   Referral: Stethoscope,
 }
+
+// Colors are the validated 4-slot categorical order (blue/orange/aqua/yellow)
+// used everywhere else these conditions get charted — same order, run
+// through the colorblind-safety checker rather than picked by eye.
+const CONDITIONS = [
+  { key: 'acne', label: 'Acne', icon: Sparkles, color: CONDITION_COLORS.acne },
+  { key: 'wrinkle', label: 'Wrinkles', icon: Waves, color: CONDITION_COLORS.wrinkle },
+  { key: 'pigmentation', label: 'Pigmentation', icon: Palette, color: CONDITION_COLORS.pigmentation },
+  { key: 'pore', label: 'Pores', icon: CircleDot, color: CONDITION_COLORS.pore },
+]
 
 const DELTA_META = {
   improved: { color: 'text-green-600 dark:text-green-400', icon: ArrowDownRight, label: 'improved' },
@@ -223,12 +234,22 @@ function ShareResultButton({ skinScore, severityToShow }) {
 export default function ResultsPage() {
   const { state } = useLocation()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isPatient = user.role === 'patient'
   const [showDetails, setShowDetails] = useState(true)
   const [activeOverlays, setActiveOverlays] = useState([])
+  const [selectedConditions, setSelectedConditions] = useState(CONDITIONS.map((c) => c.key))
 
   if (!state?.results) {
     navigate('/')
     return null
+  }
+
+  const toggleCondition = (key) => {
+    setSelectedConditions((prev) => {
+      if (prev.includes(key)) return prev.length === 1 ? prev : prev.filter((c) => c !== key)
+      return [...prev, key]
+    })
   }
 
   const { severity, recommendations, model_powered: modelPowered, ml_detections: mlDetections, session_id: sessionId, previous_severity: previousSeverity = {}, flags = {}, wsi = {}, overlays = {} } = state.results
@@ -246,19 +267,15 @@ export default function ResultsPage() {
   })
   const previousSession = patientSessions.length >= 2 ? patientSessions[patientSessions.length - 2] : null
 
-  // Staff always see the full breakdown; a patient sees only what they asked to be checked.
-  const selectedConditions = state.selectedConditions
-  const severityToShow = selectedConditions
-    ? Object.fromEntries(Object.entries(severity).filter(([k]) => selectedConditions.includes(k)))
-    : severity
-  const recommendationsToShow = selectedConditions
-    ? Object.fromEntries(
-        Object.entries(recommendations).filter(([k]) => k === 'disclaimer' || selectedConditions.includes(k))
-      )
-    : recommendations
+  // Staff always see the full breakdown (they never get the filter chips below); a
+  // patient sees only whichever conditions they've toggled on, defaulting to all 4.
+  const severityToShow = Object.fromEntries(Object.entries(severity).filter(([k]) => selectedConditions.includes(k)))
+  const recommendationsToShow = Object.fromEntries(
+    Object.entries(recommendations).filter(([k]) => k === 'disclaimer' || selectedConditions.includes(k))
+  )
 
   const overlayChoices = Object.keys(OVERLAY_META).filter(
-    (k) => (overlays[k]?.length ?? 0) > 0 && (!selectedConditions || selectedConditions.includes(k))
+    (k) => (overlays[k]?.length ?? 0) > 0 && selectedConditions.includes(k)
   )
 
   const SEVERITY_NUM = { mild: 1, moderate: 2, severe: 3 }
@@ -276,6 +293,34 @@ export default function ResultsPage() {
           {modelPowered ? 'AI model-powered' : 'Classical CV'}
         </Badge>
       </div>
+
+      {isPatient && (
+        <Card>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">What would you like to see?</label>
+          <div className="grid grid-cols-2 gap-2.5">
+            {CONDITIONS.map(({ key, label, icon: Icon, color }) => {
+              const active = selectedConditions.includes(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleCondition(key)}
+                  aria-pressed={active}
+                  style={active ? { borderColor: color, backgroundColor: `${color}17`, color } : undefined}
+                  className={`flex items-center gap-2 text-sm rounded-xl px-3 py-2.5 border transition ${
+                    active
+                      ? 'font-medium'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                  }`}
+                >
+                  <Icon className="w-4 h-4 shrink-0" />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
+        </Card>
+      )}
 
       <TriageBanner severityToShow={severityToShow} recommendationsToShow={recommendationsToShow} />
 

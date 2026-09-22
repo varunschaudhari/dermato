@@ -5,30 +5,23 @@ import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
-import { CONDITION_LABELS, COLORS } from '../constants';
+import { COLORS } from '../constants';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
-
-const CONDITIONS = ['acne', 'pigmentation', 'wrinkle', 'pore'] as const;
 
 // Results lives in the root Stack (a sibling of MainTabs), not inside the tab
 // navigator Analyze belongs to — navigate() still finds it by bubbling up to
 // the parent navigator, this type just describes where it actually lives.
-type RootStackParamList = { MainTabs: undefined; Results: { result: any; selected: string[] } };
+type RootStackParamList = { MainTabs: undefined; Results: { result: any } };
 
 export default function AnalyzeScreen() {
   const [photo, setPhoto] = useState<Asset | null>(null);
   const [qualityStatus, setQualityStatus] = useState<QualityStatus>('idle');
   const [qualityMessage, setQualityMessage] = useState('');
-  const [selected, setSelected] = useState<string[]>([...CONDITIONS]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { patientId, logout, fullName } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  const toggleCondition = (c: string) => {
-    setSelected((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
-  };
 
   // Checks the photo the moment it's picked, not just when Analyze is finally
   // tapped — see checkPhotoQuality's comment in api/client.ts for why this is
@@ -75,7 +68,7 @@ export default function AnalyzeScreen() {
         type: photo.type || 'image/jpeg',
         name: photo.fileName || 'photo.jpg',
       });
-      navigation.navigate('Results', { result: data, selected });
+      navigation.navigate('Results', { result: data });
     } catch (err: any) {
       setError(getErrorMessage(err, 'Analysis failed. Check your connection and try again.'));
     } finally {
@@ -92,25 +85,6 @@ export default function AnalyzeScreen() {
         </TouchableOpacity>
       </View>
       <Text style={styles.subtitle}>{fullName ? `Hi ${fullName.split(' ')[0]} — ` : ''}Upload a clear, well-lit photo to get started</Text>
-
-      <Text style={styles.label}>What would you like checked?</Text>
-      <View style={styles.chipsRow}>
-        {CONDITIONS.map((c) => {
-          const active = selected.includes(c);
-          return (
-            <TouchableOpacity
-              key={c}
-              onPress={() => toggleCondition(c)}
-              style={[styles.chip, active && styles.chipActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              accessibilityLabel={CONDITION_LABELS[c]}
-            >
-              <Text style={[styles.chipText, active && styles.chipTextActive]}>{CONDITION_LABELS[c]}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
 
       <View style={styles.photoBox}>
         {photo ? (
@@ -161,11 +135,11 @@ export default function AnalyzeScreen() {
       <TouchableOpacity
         style={[
           styles.button,
-          (!photo || selected.length === 0 || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
+          (!photo || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
             styles.buttonDisabled,
         ]}
         onPress={handleAnalyze}
-        disabled={!photo || selected.length === 0 || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+        disabled={!photo || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
         accessibilityRole="button"
         accessibilityLabel="Analyze Image"
       >
@@ -181,12 +155,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 20 },
-  label: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10 },
-  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  chip: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#fff' },
-  chipActive: { backgroundColor: '#ccfbf1', borderColor: COLORS.teal },
-  chipText: { fontSize: 13, color: '#4b5563' },
-  chipTextActive: { color: COLORS.teal, fontWeight: '600' },
   photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 12, overflow: 'hidden', position: 'relative' },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   photoPlaceholder: { color: COLORS.mutedGray, fontSize: 13 },

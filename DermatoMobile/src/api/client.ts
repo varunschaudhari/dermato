@@ -150,6 +150,7 @@ export interface TreatmentPlanOut {
   duration_weeks?: string | null;
   expected_recheck_at?: string | null;
   status: 'active' | 'resolved';
+  outcome_severity?: Severity | null;
   outcome?: 'improved' | 'unchanged' | 'worsened' | null;
 }
 

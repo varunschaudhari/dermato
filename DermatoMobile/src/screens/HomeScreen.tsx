@@ -14,6 +14,7 @@ import {
   NotificationOut,
 } from '../api/client';
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
+import { computeTreatmentProgress } from '../utils/treatmentProgress';
 import { CONDITION_LABELS, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 
@@ -219,6 +220,7 @@ export default function HomeScreen() {
             ) : (
               activePlans.map((p) => {
                 const recheck = recheckLabel(p.expected_recheck_at);
+                const progress = computeTreatmentProgress(p);
                 return (
                   <View key={p.id} style={styles.treatmentRow}>
                     <View style={{ flex: 1 }}>
@@ -227,6 +229,16 @@ export default function HomeScreen() {
                         <Text style={[styles.treatmentRecheck, recheck.overdue && styles.treatmentRecheckOverdue]}>
                           {recheck.text}
                         </Text>
+                      )}
+                      {progress && (
+                        <View style={styles.progressRow}>
+                          <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${progress.pct}%` }]} />
+                          </View>
+                          <Text style={styles.progressLabel}>
+                            Day {progress.elapsedDays} of {progress.totalDays}
+                          </Text>
+                        </View>
                       )}
                     </View>
                     <View style={styles.treatmentBadge}>
@@ -314,6 +326,10 @@ const styles = StyleSheet.create({
   treatmentCondition: { fontSize: 13, color: '#374151', fontWeight: '600' },
   treatmentRecheck: { fontSize: 11, color: COLORS.mutedGray, marginTop: 2 },
   treatmentRecheckOverdue: { color: '#d97706', fontWeight: '600' },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  progressTrack: { flex: 1, height: 6, backgroundColor: COLORS.border, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: COLORS.teal },
+  progressLabel: { fontSize: 10, color: COLORS.mutedGray, flexShrink: 0 },
   treatmentBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   treatmentBadgeText: { color: COLORS.teal, fontSize: 11, fontWeight: '600' },
   updateRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, paddingVertical: 7, borderTopWidth: 1, borderTopColor: COLORS.border },

@@ -17,7 +17,7 @@ def test_register_and_login(client, unique_email, unique_phone):
     assert "access_token" in res.json()
 
 
-def test_login_by_email_no_longer_works(client, unique_email, unique_phone):
+def test_login_by_email_also_works(client, unique_email, unique_phone):
     client.post(
         "/api/auth/register",
         json={"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "New Doctor"},
@@ -26,7 +26,8 @@ def test_login_by_email_no_longer_works(client, unique_email, unique_phone):
         "/api/auth/login",
         data={"username": unique_email, "password": "testpassword123"},
     )
-    assert res.status_code == 401
+    assert res.status_code == 200
+    assert "access_token" in res.json()
 
 
 def test_register_duplicate_phone_rejected(client, unique_email, unique_phone):

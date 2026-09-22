@@ -105,13 +105,16 @@ def register_patient(request: Request, payload: PatientSelfRegister, db=Depends(
 @router.post("/login", response_model=Token)
 @limiter.limit(settings.LOGIN_RATE_LIMIT)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
-    # form_data.username carries the phone number -- OAuth2PasswordRequestForm's
-    # field is always named "username" regardless of what identifier it holds.
-    user = to_ns(db.users.find_one({"phone": form_data.username}))
+    # form_data.username carries whatever identifier the patient typed -- phone
+    # number or email, either is accepted. OAuth2PasswordRequestForm's field is
+    # always named "username" regardless of which one it holds.
+    user = to_ns(db.users.find_one(
+        {"$or": [{"phone": form_data.username}, {"email": form_data.username}]}
+    ))
     if not user or not verify_password(form_data.password, user.hashed_password) or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect phone number or password",
+            detail="Incorrect phone number, email, or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token(subject=user.email)

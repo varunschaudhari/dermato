@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { useParams, useLocation, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
-import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2 } from 'lucide-react'
+import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2 } from 'lucide-react'
 import { getPatient, getPatientSessions, getTreatmentPlans, updateDoctorNote, updateSkinHistory, exportPatientData, deletePatient } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
+import { computeTreatmentProgress } from '../utils/treatmentProgress'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { BRAND_TEAL, CONDITION_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
@@ -57,6 +58,7 @@ function TreatmentPlans({ plans }) {
           const active = sorted.find((p) => p.status === 'active')
           const history = sorted.filter((p) => p.status !== 'active')
           const overdue = active?.expected_recheck_at && new Date(active.expected_recheck_at) < new Date()
+          const progress = active ? computeTreatmentProgress(active) : null
 
           return (
             <div key={condition}>
@@ -79,6 +81,19 @@ function TreatmentPlans({ plans }) {
                       </>
                     )}
                   </p>
+                  {progress && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-white/60 dark:bg-black/20 rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-brand-500"
+                          style={{ width: `${progress.pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 shrink-0">
+                        Day {progress.elapsedDays} of {progress.totalDays}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -87,9 +102,22 @@ function TreatmentPlans({ plans }) {
                   {history.map((p) => {
                     const meta = OUTCOME_META[p.outcome] || OUTCOME_META.unchanged
                     return (
-                      <div key={p.id} className="flex items-center justify-between gap-2 text-xs text-gray-500 dark:text-gray-400">
-                        <span>{p.remedy_type} from {new Date(p.started_at).toLocaleDateString()}</span>
-                        <Badge color={meta.color} icon={meta.icon}>{meta.label}</Badge>
+                      <div key={p.id} className="text-xs text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center justify-between gap-2">
+                          <span>{p.remedy_type} from {new Date(p.started_at).toLocaleDateString()}</span>
+                          <Badge color={meta.color} icon={meta.icon}>{meta.label}</Badge>
+                        </div>
+                        {p.severity_at_start && p.outcome_severity && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Badge color={SEVERITY[p.severity_at_start]?.color} icon={SEVERITY[p.severity_at_start]?.icon}>
+                              {p.severity_at_start}
+                            </Badge>
+                            <ArrowRight className="w-3 h-3 text-gray-400 dark:text-gray-500 shrink-0" />
+                            <Badge color={SEVERITY[p.outcome_severity]?.color} icon={SEVERITY[p.outcome_severity]?.icon}>
+                              {p.outcome_severity}
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     )
                   })}

@@ -3,7 +3,7 @@ import { useDropzone } from 'react-dropzone'
 import { useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  Sparkles, Waves, Palette, CircleDot, UploadCloud, Camera, ScanFace, Users,
+  UploadCloud, Camera, ScanFace, Users,
   CheckCircle2, RotateCcw, ScanLine, TrendingUp, Image as ImageIcon, X, Aperture, Plus,
   SwitchCamera, Zap, ZapOff, Timer, ClipboardList,
 } from 'lucide-react'
@@ -12,21 +12,10 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { compressImage } from '../utils/compressImage'
 import { assessVideoFrame, qualityHint } from '../utils/photoQuality'
-import { CONDITION_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
 import EmptyState from '../components/ui/EmptyState'
-
-// Colors are the validated 4-slot categorical order (blue/orange/aqua/yellow)
-// used everywhere else these conditions get charted — same order, run
-// through the colorblind-safety checker rather than picked by eye.
-const CONDITIONS = [
-  { key: 'acne', label: 'Acne', icon: Sparkles, color: CONDITION_COLORS.acne },
-  { key: 'wrinkle', label: 'Wrinkles', icon: Waves, color: CONDITION_COLORS.wrinkle },
-  { key: 'pigmentation', label: 'Pigmentation', icon: Palette, color: CONDITION_COLORS.pigmentation },
-  { key: 'pore', label: 'Pores', icon: CircleDot, color: CONDITION_COLORS.pore },
-]
 
 // Small tick-ruler motif — a measurement-instrument detail above each
 // "how it works" step instead of a plain numbered marker.
@@ -97,7 +86,6 @@ export default function AnalyzePage() {
   const [compressing, setCompressing] = useState(false)
   const [justCaptured, setJustCaptured] = useState(false)
   const [patientId, setPatientId] = useState(isPatient ? String(user.patient_id) : '')
-  const [selectedConditions, setSelectedConditions] = useState(CONDITIONS.map((c) => c.key))
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [analysisStage, setAnalysisStage] = useState(0)
@@ -323,12 +311,8 @@ export default function AnalyzePage() {
     noKeyboard: true,
   })
 
-  const toggleCondition = (key) => {
-    setSelectedConditions((prev) => (prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]))
-  }
-
   const handleAnalyze = async () => {
-    if (!file || !patientId || selectedConditions.length === 0) return
+    if (!file || !patientId) return
     setLoading(true)
     setError('')
     setIsQualityError(false)
@@ -346,7 +330,7 @@ export default function AnalyzePage() {
       const { data } = await analyzeImage(formData, (evt) => {
         if (evt.total) setProgress(Math.round((evt.loaded / evt.total) * 100))
       })
-      navigate('/results', { state: { results: data, imageUrl: preview, patientId, selectedConditions } })
+      navigate('/results', { state: { results: data, imageUrl: preview, patientId } })
     } catch (err) {
       const detail = err.response?.data?.detail
       if (detail && typeof detail === 'object' && detail.message) {
@@ -410,37 +394,6 @@ export default function AnalyzePage() {
                 <option key={p.id} value={p.id}>{p.name} (Age {p.age})</option>
               ))}
             </select>
-          )}
-        </Card>
-      )}
-
-      {isPatient && (
-        <Card className="mb-5">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">What would you like checked?</label>
-          <div className="grid grid-cols-2 gap-2.5">
-            {CONDITIONS.map(({ key, label, icon: Icon, color }) => {
-              const active = selectedConditions.includes(key)
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleCondition(key)}
-                  aria-pressed={active}
-                  style={active ? { borderColor: color, backgroundColor: `${color}17`, color } : undefined}
-                  className={`flex items-center gap-2 text-sm rounded-xl px-3 py-2.5 border transition ${
-                    active
-                      ? 'font-medium'
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-          {selectedConditions.length === 0 && (
-            <p className="text-xs text-red-500 mt-2">Select at least one condition to check.</p>
           )}
         </Card>
       )}
@@ -722,7 +675,7 @@ export default function AnalyzePage() {
       {file && !loading && (
         <Button
           onClick={() => setShowReview(true)}
-          disabled={!patientId || selectedConditions.length === 0}
+          disabled={!patientId}
           icon={ScanFace}
           fullWidth
           className="mt-5 py-3"

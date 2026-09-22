@@ -34,7 +34,9 @@ import { computeSkinScoreFromSeverities, computeSkinScoreFromSession, scoreMeta 
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
 
-type RootStackParamList = { MainTabs: { screen: string } | undefined; Results: { result: AnalyzeResult; selected: string[] } };
+type RootStackParamList = { MainTabs: { screen: string } | undefined; Results: { result: AnalyzeResult } };
+
+const FILTER_CONDITIONS = ['acne', 'wrinkle', 'pigmentation', 'pore'];
 
 const OVERLAY_META: Record<string, { label: string; color: string }> = {
   acne: { label: 'Acne', color: '#ef4444' },
@@ -213,7 +215,7 @@ function PatientNoteCard({ sessionId }: { sessionId: number }) {
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const { result, selected } = route.params;
+  const { result } = route.params;
   const {
     severity, recommendations, model_powered: modelPowered, ml_detections: mlDetections,
     previous_severity: previousSeverity = {}, flags = {}, wsi = {}, overlays = {}, image_url: imageUrl, patient_id: patientId,
@@ -225,6 +227,14 @@ export default function ResultsScreen() {
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+  const [selected, setSelected] = useState<string[]>(FILTER_CONDITIONS);
+
+  const toggleFilterCondition = (c: string) => {
+    setSelected((prev) => {
+      if (prev.includes(c)) return prev.length === 1 ? prev : prev.filter((x) => x !== c);
+      return [...prev, c];
+    });
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -288,6 +298,25 @@ export default function ResultsScreen() {
           {modelPowered ? <Cpu size={12} color="#0d9488" /> : <FlaskConical size={12} color="#0d9488" />}
           <Text style={styles.modelBadgeText}>{modelPowered ? 'AI model-powered' : 'Classical CV'}</Text>
         </View>
+      </View>
+
+      <Text style={styles.filterLabel}>What would you like to see?</Text>
+      <View style={styles.chipsRow}>
+        {FILTER_CONDITIONS.map((c) => {
+          const active = selected.includes(c);
+          return (
+            <TouchableOpacity
+              key={c}
+              onPress={() => toggleFilterCondition(c)}
+              style={[styles.chip, active && styles.chipActive]}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={CONDITION_LABELS[c]}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>{CONDITION_LABELS[c]}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={[styles.alertBanner, needsAttention ? styles.alertWarning : styles.alertInfo]}>
@@ -632,6 +661,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   modelBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#ccfbf1', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
   modelBadgeText: { fontSize: 11, color: COLORS.teal, fontWeight: '600' },
+  filterLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 10 },
+  chipsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  chip: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 20, paddingVertical: 8, paddingHorizontal: 14, backgroundColor: '#fff' },
+  chipActive: { backgroundColor: '#ccfbf1', borderColor: COLORS.teal },
+  chipText: { fontSize: 13, color: '#4b5563' },
+  chipTextActive: { color: COLORS.teal, fontWeight: '600' },
   alertBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, padding: 14, marginBottom: 16 },
   alertWarning: { backgroundColor: '#fffbeb' },
   alertInfo: { backgroundColor: '#f0fdfa' },

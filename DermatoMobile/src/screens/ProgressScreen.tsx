@@ -2,6 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { ArrowRight } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
@@ -13,7 +14,8 @@ import {
   TreatmentPlanOut,
   SkinHistory,
 } from '../api/client';
-import { CONDITION_LABELS, COLORS } from '../constants';
+import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
+import { computeTreatmentProgress } from '../utils/treatmentProgress';
 import ErrorState from '../components/ErrorState';
 import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
 
@@ -260,27 +262,55 @@ export default function ProgressScreen() {
             {plans.length === 0 ? (
               <Text style={styles.emptyText}>No treatment plans yet.</Text>
             ) : (
-              plans.map((p) => (
-                <View key={p.id} style={styles.planRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.planCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
-                    <Text style={styles.planRemedy}>{p.remedy_type} · started {new Date(p.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
-                    {p.status === 'active' && p.expected_recheck_at && (
-                      <Text style={styles.planRecheck}>
-                        {new Date(p.expected_recheck_at) < new Date() ? 'Recheck overdue since ' : 'Recheck due '}
-                        {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                      </Text>
-                    )}
-                  </View>
-                  {p.status === 'active' ? (
-                    <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>
-                  ) : p.outcome ? (
-                    <View style={[styles.outcomeBadge, { backgroundColor: `${OUTCOME_META[p.outcome].color}20` }]}>
-                      <Text style={[styles.outcomeBadgeText, { color: OUTCOME_META[p.outcome].color }]}>{OUTCOME_META[p.outcome].label}</Text>
+              plans.map((p) => {
+                const progress = computeTreatmentProgress(p);
+                return (
+                  <View key={p.id} style={styles.planRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.planCondition}>{CONDITION_LABELS[p.condition] || p.condition}</Text>
+                      <Text style={styles.planRemedy}>{p.remedy_type} · started {new Date(p.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+                      {p.status === 'active' && p.expected_recheck_at && (
+                        <Text style={styles.planRecheck}>
+                          {new Date(p.expected_recheck_at) < new Date() ? 'Recheck overdue since ' : 'Recheck due '}
+                          {new Date(p.expected_recheck_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </Text>
+                      )}
+                      {progress && (
+                        <View style={styles.progressRow}>
+                          <View style={styles.progressTrack}>
+                            <View style={[styles.progressFill, { width: `${progress.pct}%` }]} />
+                          </View>
+                          <Text style={styles.progressLabel}>
+                            Day {progress.elapsedDays} of {progress.totalDays}
+                          </Text>
+                        </View>
+                      )}
+                      {p.status === 'resolved' && p.severity_at_start && p.outcome_severity && (
+                        <View style={styles.transitionRow}>
+                          <View style={[styles.severityPill, { backgroundColor: SEVERITY_META[p.severity_at_start].bg }]}>
+                            <Text style={[styles.severityPillText, { color: SEVERITY_META[p.severity_at_start].color }]}>
+                              {SEVERITY_META[p.severity_at_start].label}
+                            </Text>
+                          </View>
+                          <ArrowRight size={12} color={COLORS.mutedGray} />
+                          <View style={[styles.severityPill, { backgroundColor: SEVERITY_META[p.outcome_severity].bg }]}>
+                            <Text style={[styles.severityPillText, { color: SEVERITY_META[p.outcome_severity].color }]}>
+                              {SEVERITY_META[p.outcome_severity].label}
+                            </Text>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  ) : null}
-                </View>
-              ))
+                    {p.status === 'active' ? (
+                      <View style={styles.activeBadge}><Text style={styles.activeBadgeText}>Active</Text></View>
+                    ) : p.outcome ? (
+                      <View style={[styles.outcomeBadge, { backgroundColor: `${OUTCOME_META[p.outcome].color}20` }]}>
+                        <Text style={[styles.outcomeBadgeText, { color: OUTCOME_META[p.outcome].color }]}>{OUTCOME_META[p.outcome].label}</Text>
+                      </View>
+                    ) : null}
+                  </View>
+                );
+              })
             )}
           </View>
 
@@ -315,6 +345,13 @@ const styles = StyleSheet.create({
   planCondition: { fontSize: 13, fontWeight: '600', color: '#374151' },
   planRemedy: { fontSize: 11, color: COLORS.mutedGray, marginTop: 1 },
   planRecheck: { fontSize: 11, color: '#d97706', marginTop: 2, fontWeight: '600' },
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+  progressTrack: { flex: 1, height: 6, backgroundColor: COLORS.border, borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', borderRadius: 3, backgroundColor: COLORS.teal },
+  progressLabel: { fontSize: 10, color: COLORS.mutedGray, flexShrink: 0 },
+  transitionRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6 },
+  severityPill: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  severityPillText: { fontSize: 10, fontWeight: '700', textTransform: 'capitalize' },
   activeBadge: { backgroundColor: '#ccfbf1', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   activeBadgeText: { color: COLORS.teal, fontSize: 11, fontWeight: '600' },
   outcomeBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },

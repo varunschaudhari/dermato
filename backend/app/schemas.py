@@ -16,7 +16,7 @@ class PatientSelfRegister(BaseModel):
     full_name: str
     age: int
     skin_type: str
-    # Not used to log in (phone is) -- kept for password-reset links/notifications.
+    # Login accepts either phone or email -- this is also used for password-reset links/notifications.
     email: str
 
 
@@ -132,7 +132,7 @@ class UserCreate(BaseModel):
     password: str
     full_name: str
     role: str = "dermatologist"
-    # Not used to log in (phone is) -- kept for password-reset links/notifications.
+    # Login accepts either phone or email -- this is also used for password-reset links/notifications.
     email: str
 
 
