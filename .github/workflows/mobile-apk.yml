@@ -45,7 +45,9 @@ jobs:
       # an ad-hoc test build.
       - name: Build release APK
         working-directory: DermatoMobile/android
-        run: ./gradlew assembleRelease --no-daemon
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
