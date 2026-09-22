@@ -70,10 +70,12 @@ export function getErrorMessage(err: any, fallback: string): string {
   return fallback;
 }
 
-export const login = (email: string, password: string) => {
+export const login = (phone: string, password: string) => {
   // Hermes' URLSearchParams support is inconsistent across RN versions — build
   // the form-urlencoded body by hand rather than relying on form.toString().
-  const body = `username=${encodeURIComponent(email)}&password=${encodeURIComponent(password)}`;
+  // OAuth2PasswordRequestForm's field is always named "username" regardless
+  // of what identifier it holds -- it carries the phone number now.
+  const body = `username=${encodeURIComponent(phone)}&password=${encodeURIComponent(password)}`;
   return api.post('/auth/login', body, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
   });
@@ -82,6 +84,7 @@ export const login = (email: string, password: string) => {
 export const getMe = () => api.get('/auth/me');
 
 export interface RegisterPatientPayload {
+  phone: string;
   email: string;
   password: string;
   full_name: string;

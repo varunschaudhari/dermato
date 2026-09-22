@@ -11,13 +11,13 @@ def _create_patient(client, headers, name="Session Patient"):
     return res.json()["id"]
 
 
-def _create_patient_login(client, staff_headers, patient_id, email, password="patientpass123"):
+def _create_patient_login(client, staff_headers, patient_id, phone, email, password="patientpass123"):
     client.post(
         f"/api/patients/{patient_id}/account",
-        json={"email": email, "password": password},
+        json={"phone": phone, "email": email, "password": password},
         headers=staff_headers,
     )
-    res = client.post("/api/auth/login", data={"username": email, "password": password})
+    res = client.post("/api/auth/login", data={"username": phone, "password": password})
     token = res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
 
@@ -41,9 +41,11 @@ def _create_session(client, headers, patient_id):
     return res.json()["session_id"]
 
 
-def test_patient_can_note_own_session(client, auth_headers, unique_email):
+def test_patient_can_note_own_session(client, auth_headers, unique_email, unique_phone):
     patient_id = _create_patient(client, auth_headers)
-    patient_headers = _create_patient_login(client, auth_headers, patient_id, f"patient.{unique_email}")
+    # auth_headers already claimed the raw unique_phone value for the
+    # dermatologist (fixtures are cached per-test) -- derive a distinct one.
+    patient_headers = _create_patient_login(client, auth_headers, patient_id, f"1{unique_phone}", f"patient.{unique_email}")
     session_id = _create_session(client, patient_headers, patient_id)
 
     res = client.patch(
@@ -55,11 +57,11 @@ def test_patient_can_note_own_session(client, auth_headers, unique_email):
     assert res.json()["patient_note"] == "Started a new moisturizer today"
 
 
-def test_patient_cannot_note_another_patients_session(client, auth_headers, unique_email):
+def test_patient_cannot_note_another_patients_session(client, auth_headers, unique_email, unique_phone):
     patient_id = _create_patient(client, auth_headers, "Owner")
     other_patient_id = _create_patient(client, auth_headers, "Intruder")
     session_id = _create_session(client, auth_headers, patient_id)
-    other_headers = _create_patient_login(client, auth_headers, other_patient_id, f"intruder.{unique_email}")
+    other_headers = _create_patient_login(client, auth_headers, other_patient_id, f"1{unique_phone}", f"intruder.{unique_email}")
 
     res = client.patch(
         f"/api/sessions/{session_id}/patient-note", json={"note": "not mine"}, headers=other_headers

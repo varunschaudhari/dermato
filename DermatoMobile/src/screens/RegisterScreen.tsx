@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { User, Mail, Lock, Calendar, Eye, EyeOff } from 'lucide-react-native';
+import { User, Mail, Phone, Lock, Calendar, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { registerPatient, getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
@@ -12,7 +12,7 @@ type RootStackParamList = { Login: undefined; Register: undefined };
 const SKIN_TYPES = ['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive'];
 
 export default function RegisterScreen() {
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', age: '', skin_type: '' });
+  const [form, setForm] = useState({ full_name: '', phone: '', email: '', password: '', age: '', skin_type: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +20,7 @@ export default function RegisterScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const handleSubmit = async () => {
-    if (!form.full_name || !form.email || !form.password || !form.age || !form.skin_type) {
+    if (!form.full_name || !form.phone || !form.email || !form.password || !form.age || !form.skin_type) {
       setError('Please fill in every field.');
       return;
     }
@@ -55,6 +55,19 @@ export default function RegisterScreen() {
             value={form.full_name}
             onChangeText={(v) => setForm({ ...form, full_name: v })}
             placeholder="Jane Doe"
+          />
+        </View>
+
+        <Text style={styles.label}>Mobile number</Text>
+        <View style={styles.inputWrapper}>
+          <Phone size={16} color="#9ca3af" style={styles.inputIcon} />
+          <TextInput
+            style={styles.input}
+            autoCapitalize="none"
+            keyboardType="phone-pad"
+            value={form.phone}
+            onChangeText={(v) => setForm({ ...form, phone: v })}
+            placeholder="9876543210"
           />
         </View>
 

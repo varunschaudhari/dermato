@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Mail, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { Phone, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
@@ -10,7 +10,7 @@ import { COLORS } from '../constants';
 type RootStackParamList = { Login: undefined; Register: undefined };
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -22,9 +22,9 @@ export default function LoginScreen() {
     setError('');
     setLoading(true);
     try {
-      await login(email, password);
+      await login(phone, password);
     } catch (err: any) {
-      setError(getErrorMessage(err, 'Login failed. Check your email and password.'));
+      setError(getErrorMessage(err, 'Login failed. Check your mobile number and password.'));
     } finally {
       setLoading(false);
     }
@@ -40,16 +40,16 @@ export default function LoginScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Text style={styles.label}>Email</Text>
+      <Text style={styles.label}>Mobile number</Text>
       <View style={styles.inputWrapper}>
-        <Mail size={16} color="#9ca3af" style={styles.inputIcon} />
+        <Phone size={16} color="#9ca3af" style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           autoCapitalize="none"
-          keyboardType="email-address"
-          value={email}
-          onChangeText={setEmail}
-          placeholder="you@example.com"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="9876543210"
         />
       </View>
 

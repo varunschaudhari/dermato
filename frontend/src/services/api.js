@@ -30,9 +30,11 @@ api.interceptors.response.use(
   }
 )
 
-export const login = (email, password) => {
+export const login = (phone, password) => {
+  // OAuth2PasswordRequestForm's field is always named "username" regardless
+  // of what identifier it holds -- it carries the phone number now.
   const form = new URLSearchParams()
-  form.append('username', email)
+  form.append('username', phone)
   form.append('password', password)
   return api.post('/auth/login', form, {
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

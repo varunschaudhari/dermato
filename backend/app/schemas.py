@@ -11,11 +11,13 @@ class PatientCreate(BaseModel):
 
 
 class PatientSelfRegister(BaseModel):
-    email: str
+    phone: str
     password: str
     full_name: str
     age: int
     skin_type: str
+    # Not used to log in (phone is) -- kept for password-reset links/notifications.
+    email: str
 
 
 class DoctorSummary(BaseModel):
@@ -126,16 +128,19 @@ class TreatmentPlanOut(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: str
+    phone: str
     password: str
     full_name: str
     role: str = "dermatologist"
+    # Not used to log in (phone is) -- kept for password-reset links/notifications.
+    email: str
 
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    phone: Optional[str] = None
     email: str
     full_name: Optional[str] = None
     role: str
@@ -146,6 +151,7 @@ class UserOut(BaseModel):
 
 
 class PatientAccountCreate(BaseModel):
+    phone: str
     email: str
     password: str
 
@@ -153,6 +159,7 @@ class PatientAccountCreate(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
+    phone: Optional[str] = None
 
 
 class PasswordChange(BaseModel):

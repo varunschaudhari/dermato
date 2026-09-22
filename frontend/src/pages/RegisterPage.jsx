@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { User, Mail, Lock } from 'lucide-react'
+import { User, Mail, Phone, Lock } from 'lucide-react'
 import { register } from '../services/api'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import AuthLayout from '../components/ui/AuthLayout'
 
 export default function RegisterPage() {
-  const [form, setForm] = useState({ full_name: '', email: '', password: '' })
+  const [form, setForm] = useState({ full_name: '', phone: '', email: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
@@ -46,6 +46,21 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
+              <label htmlFor="register-phone" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Mobile number</label>
+              <div className="relative">
+                <Phone className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  id="register-phone"
+                  type="tel"
+                  required
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
+                />
+              </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Used to sign in.</p>
+            </div>
+            <div>
               <label htmlFor="register-email" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Email</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -58,6 +73,7 @@ export default function RegisterPage() {
                   className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl pl-9 pr-3 py-2.5 text-sm focus:border-brand-500"
                 />
               </div>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Used for password-reset links only.</p>
             </div>
             <div>
               <label htmlFor="register-password" className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Password</label>

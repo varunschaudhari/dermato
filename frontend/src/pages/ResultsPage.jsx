@@ -2,12 +2,11 @@ import { useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
-import { RadarChart, PolarGrid, PolarAngleAxis, Radar, ResponsiveContainer } from 'recharts'
 import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock } from 'lucide-react'
 import { getPatientSessions, getTreatmentPlans, updatePatientNote } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
 import { useToast } from '../context/ToastContext'
-import { BRAND_TEAL, DETECTION_COLORS } from '../lib/colors'
+import { DETECTION_COLORS } from '../lib/colors'
 import Card from '../components/ui/Card'
 import Badge, { SEVERITY } from '../components/ui/Badge'
 import Button from '../components/ui/Button'
@@ -25,6 +24,28 @@ const DELTA_META = {
   improved: { color: 'text-green-600 dark:text-green-400', icon: ArrowDownRight, label: 'improved' },
   same: { color: 'text-gray-400 dark:text-gray-500', icon: Minus, label: 'unchanged' },
   worsened: { color: 'text-red-600 dark:text-red-400', icon: ArrowUpRight, label: 'worsened' },
+}
+
+// Same green/amber/red hue family as Badge's SEVERITY, just a solid shade for a filled bar
+// rather than a light pill background.
+const SEVERITY_BAR_COLOR = { mild: 'bg-green-500', moderate: 'bg-amber-500', severe: 'bg-red-500' }
+const SEVERITY_BAR_PCT = { mild: 33, moderate: 66, severe: 100 }
+
+function SeverityBar({ condition, level }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-28 shrink-0 text-sm text-gray-700 dark:text-gray-300 capitalize">{condition}</span>
+      <div className="flex-1 h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full ${SEVERITY_BAR_COLOR[level]}`}
+          style={{ width: `${SEVERITY_BAR_PCT[level] ?? 0}%` }}
+        />
+      </div>
+      <Badge color={SEVERITY[level]?.color} icon={SEVERITY[level]?.icon} className="shrink-0">
+        {level}
+      </Badge>
+    </div>
+  )
 }
 
 // The acne-detection model and the skin-problems model return two overlapping label
@@ -241,10 +262,6 @@ export default function ResultsPage() {
   )
 
   const SEVERITY_NUM = { mild: 1, moderate: 2, severe: 3 }
-  const radarData = Object.entries(severityToShow).map(([condition, level]) => ({
-    subject: condition.charAt(0).toUpperCase() + condition.slice(1),
-    value: SEVERITY_NUM[level] ?? 0,
-  }))
 
   const skinScore = computeSkinScoreFromSeverities(severity)
   const previousScore = computeSkinScoreFromSeverities(previousSeverity)
@@ -450,16 +467,14 @@ export default function ResultsPage() {
         })}
       </div>
 
-      {/* Radar chart */}
+      {/* Severity overview */}
       <Card>
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Severity Overview</h2>
-        <ResponsiveContainer width="100%" height={250}>
-          <RadarChart data={radarData}>
-            <PolarGrid />
-            <PolarAngleAxis dataKey="subject" tick={{ fontSize: 12 }} />
-            <Radar dataKey="value" stroke={BRAND_TEAL} fill={BRAND_TEAL} fillOpacity={0.4} />
-          </RadarChart>
-        </ResponsiveContainer>
+        <div className="space-y-3">
+          {Object.entries(severityToShow).map(([condition, level]) => (
+            <SeverityBar key={condition} condition={condition} level={level} />
+          ))}
+        </div>
       </Card>
 
       {/* AI detections */}

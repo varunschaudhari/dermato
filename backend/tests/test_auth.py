@@ -1,34 +1,62 @@
-def test_register_and_login(client, unique_email):
+def test_register_and_login(client, unique_email, unique_phone):
     res = client.post(
         "/api/auth/register",
-        json={"email": unique_email, "password": "testpassword123", "full_name": "New Doctor"},
+        json={"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "New Doctor"},
     )
     assert res.status_code == 200
     body = res.json()
+    assert body["phone"] == unique_phone
     assert body["email"] == unique_email
     assert body["role"] == "dermatologist"  # self-registration is always dermatologist
 
     res = client.post(
         "/api/auth/login",
-        data={"username": unique_email, "password": "testpassword123"},
+        data={"username": unique_phone, "password": "testpassword123"},
     )
     assert res.status_code == 200
     assert "access_token" in res.json()
 
 
-def test_register_duplicate_email_rejected(client, unique_email):
-    payload = {"email": unique_email, "password": "testpassword123", "full_name": "Dup"}
+def test_login_by_email_no_longer_works(client, unique_email, unique_phone):
+    client.post(
+        "/api/auth/register",
+        json={"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "New Doctor"},
+    )
+    res = client.post(
+        "/api/auth/login",
+        data={"username": unique_email, "password": "testpassword123"},
+    )
+    assert res.status_code == 401
+
+
+def test_register_duplicate_phone_rejected(client, unique_email, unique_phone):
+    payload = {"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "Dup"}
     assert client.post("/api/auth/register", json=payload).status_code == 200
-    res = client.post("/api/auth/register", json=payload)
+    # Same phone, different email -- still rejected on the phone collision.
+    res = client.post(
+        "/api/auth/register",
+        json={**payload, "email": f"other.{unique_email}"},
+    )
     assert res.status_code == 400
 
 
-def test_login_wrong_password_rejected(client, unique_email):
+def test_register_duplicate_email_rejected(client, unique_email, unique_phone):
+    payload = {"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "Dup"}
+    assert client.post("/api/auth/register", json=payload).status_code == 200
+    # Same email, different phone -- still rejected on the email collision.
+    res = client.post(
+        "/api/auth/register",
+        json={**payload, "phone": f"9{unique_phone}"},
+    )
+    assert res.status_code == 400
+
+
+def test_login_wrong_password_rejected(client, unique_email, unique_phone):
     client.post(
         "/api/auth/register",
-        json={"email": unique_email, "password": "testpassword123", "full_name": "X"},
+        json={"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "X"},
     )
-    res = client.post("/api/auth/login", data={"username": unique_email, "password": "wrongpass"})
+    res = client.post("/api/auth/login", data={"username": unique_phone, "password": "wrongpass"})
     assert res.status_code == 401
 
 
@@ -43,11 +71,11 @@ def test_me_returns_current_user(client, auth_headers):
     assert res.json()["role"] == "dermatologist"
 
 
-def test_forgot_password_does_not_leak_whether_email_exists(client, unique_email):
+def test_forgot_password_does_not_leak_whether_email_exists(client, unique_email, unique_phone):
     res_unknown = client.post("/api/auth/forgot-password", json={"email": "nobody@nowhere.example"})
     client.post(
         "/api/auth/register",
-        json={"email": unique_email, "password": "testpassword123", "full_name": "X"},
+        json={"phone": unique_phone, "email": unique_email, "password": "testpassword123", "full_name": "X"},
     )
     res_known = client.post("/api/auth/forgot-password", json={"email": unique_email})
 

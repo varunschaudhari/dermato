@@ -238,11 +238,14 @@ def create_patient_account(patient_id: int, payload: PatientAccountCreate, db=De
         raise HTTPException(status_code=404, detail="Patient not found")
     if db.users.find_one({"patient_id": patient_id}):
         raise HTTPException(status_code=400, detail="This patient already has a login account")
+    if db.users.find_one({"phone": payload.phone}):
+        raise HTTPException(status_code=400, detail="Phone number already registered")
     if db.users.find_one({"email": payload.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     doc = {
         "_id": next_id("users"),
+        "phone": payload.phone,
         "email": payload.email,
         "hashed_password": hash_password(payload.password),
         "full_name": patient["name"],

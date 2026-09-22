@@ -38,6 +38,8 @@ STAFF_ROLES = {"admin", "dermatologist"}
 @router.post("/register", response_model=UserOut)
 @limiter.limit(settings.LOGIN_RATE_LIMIT)
 def register(request: Request, payload: UserCreate, db=Depends(get_db)):
+    if db.users.find_one({"phone": payload.phone}):
+        raise HTTPException(status_code=400, detail="Phone number already registered")
     if db.users.find_one({"email": payload.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
 
@@ -45,6 +47,7 @@ def register(request: Request, payload: UserCreate, db=Depends(get_db)):
     # are created by an existing admin via POST /users.
     doc = {
         "_id": next_id("users"),
+        "phone": payload.phone,
         "email": payload.email,
         "hashed_password": hash_password(payload.password),
         "full_name": payload.full_name,
@@ -63,6 +66,8 @@ def register_patient(request: Request, payload: PatientSelfRegister, db=Depends(
     """Public patient self-registration — creates the patient record and its
     login account together and signs them in immediately (no email verification
     step, matching the same instant-signup behavior as /register)."""
+    if db.users.find_one({"phone": payload.phone}):
+        raise HTTPException(status_code=400, detail="Phone number already registered")
     if db.users.find_one({"email": payload.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
     if len(payload.password) < 8:
@@ -82,6 +87,7 @@ def register_patient(request: Request, payload: PatientSelfRegister, db=Depends(
 
     user_doc = {
         "_id": next_id("users"),
+        "phone": payload.phone,
         "email": payload.email,
         "hashed_password": hash_password(payload.password),
         "full_name": payload.full_name,
@@ -99,11 +105,13 @@ def register_patient(request: Request, payload: PatientSelfRegister, db=Depends(
 @router.post("/login", response_model=Token)
 @limiter.limit(settings.LOGIN_RATE_LIMIT)
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db=Depends(get_db)):
-    user = to_ns(db.users.find_one({"email": form_data.username}))
+    # form_data.username carries the phone number -- OAuth2PasswordRequestForm's
+    # field is always named "username" regardless of what identifier it holds.
+    user = to_ns(db.users.find_one({"phone": form_data.username}))
     if not user or not verify_password(form_data.password, user.hashed_password) or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect email or password",
+            detail="Incorrect phone number or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
     token = create_access_token(subject=user.email)
@@ -118,6 +126,10 @@ def me(current_user=Depends(get_current_user)):
 @router.patch("/me", response_model=UserOut)
 def update_me(payload: UserUpdate, db=Depends(get_db), current_user=Depends(get_current_user)):
     updates = {}
+    if payload.phone and payload.phone != getattr(current_user, "phone", None):
+        if db.users.find_one({"phone": payload.phone}):
+            raise HTTPException(status_code=400, detail="Phone number already registered")
+        updates["phone"] = payload.phone
     if payload.email and payload.email != current_user.email:
         if db.users.find_one({"email": payload.email}):
             raise HTTPException(status_code=400, detail="Email already registered")
@@ -188,11 +200,14 @@ def list_users(db=Depends(get_db), _=Depends(require_role("admin"))):
 def create_user(payload: UserCreate, db=Depends(get_db), _=Depends(require_role("admin"))):
     if payload.role not in STAFF_ROLES:
         raise HTTPException(status_code=400, detail=f"role must be one of {sorted(STAFF_ROLES)}")
+    if db.users.find_one({"phone": payload.phone}):
+        raise HTTPException(status_code=400, detail="Phone number already registered")
     if db.users.find_one({"email": payload.email}):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     doc = {
         "_id": next_id("users"),
+        "phone": payload.phone,
         "email": payload.email,
         "hashed_password": hash_password(payload.password),
         "full_name": payload.full_name,

@@ -20,6 +20,7 @@ def _bootstrap_admin() -> None:
         db.users.insert_one(
             {
                 "_id": next_id("users"),
+                "phone": settings.ADMIN_PHONE,
                 "email": settings.ADMIN_EMAIL,
                 "hashed_password": hash_password(settings.ADMIN_PASSWORD),
                 "full_name": "Default Admin",
@@ -30,7 +31,7 @@ def _bootstrap_admin() -> None:
             }
         )
         print(
-            f"Created default admin user: {settings.ADMIN_EMAIL} / {settings.ADMIN_PASSWORD} "
+            f"Created default admin user: {settings.ADMIN_PHONE} / {settings.ADMIN_PASSWORD} "
             "— change this password immediately."
         )
 

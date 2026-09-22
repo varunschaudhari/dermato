@@ -7,7 +7,7 @@ interface AuthState {
   token: string | null;
   patientId: number | null;
   fullName: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
   loginWithToken: (token: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -48,8 +48,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFullName(me.data.full_name ?? null);
   };
 
-  const login = async (email: string, password: string) => {
-    const { data } = await loginApi(email, password);
+  const login = async (phone: string, password: string) => {
+    const { data } = await loginApi(phone, password);
     await loginWithToken(data.access_token);
   };
 

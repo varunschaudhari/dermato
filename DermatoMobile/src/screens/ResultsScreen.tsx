@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, ScrollView, StyleSheet, TouchableOpacity, TextInput, Dimensions, Share, LayoutAnimation } from 'react-native';
-import Svg, { Rect, Polygon, Polyline, Circle, Line as SvgLine } from 'react-native-svg';
+import Svg, { Rect, Polygon, Polyline } from 'react-native-svg';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -70,58 +70,23 @@ const DELTA_META: Record<string, { color: string; icon: typeof ArrowUpRight; lab
   worsened: { color: '#dc2626', icon: ArrowUpRight, label: 'worsened' },
 };
 
-// Hand-rolled radar/spider chart — no charting lib on mobile, but
-// react-native-svg (added for icons) gives us the primitives to draw one
-// directly: N axes at even angles, concentric grid rings, and a filled
-// polygon for the data itself.
-function RadarChart({ data, size = 240 }: { data: { subject: string; value: number }[]; size?: number }) {
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = size / 2 - 36;
-  const n = data.length;
-  if (n < 3) return null;
+const SEVERITY_BAR_PCT: Record<string, number> = { mild: 33, moderate: 66, severe: 100 };
 
-  const angleFor = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-  const pointAt = (i: number, fraction: number) => {
-    const angle = angleFor(i);
-    return [cx + Math.cos(angle) * r * fraction, cy + Math.sin(angle) * r * fraction];
-  };
-
-  const gridRings = [0.33, 0.66, 1];
-  const dataPoints = data.map((d, i) => pointAt(i, Math.min(d.value, 3) / 3));
-  const dataPolygon = dataPoints.map(([x, y]) => `${x},${y}`).join(' ');
-
+function SeverityBar({ condition, level }: { condition: string; level: string }) {
+  const meta = SEVERITY_META[level] ?? SEVERITY_META.mild;
   return (
-    <View style={{ alignItems: 'center' }}>
-      <Svg width={size} height={size}>
-        {gridRings.map((fraction) => {
-          const ringPoints = data.map((_, i) => pointAt(i, fraction).join(',')).join(' ');
-          return <Polygon key={fraction} points={ringPoints} fill="none" stroke="#e5e7eb" strokeWidth={1} />;
-        })}
-        {data.map((_, i) => {
-          const [x, y] = pointAt(i, 1);
-          return <SvgLine key={i} x1={cx} y1={cy} x2={x} y2={y} stroke="#e5e7eb" strokeWidth={1} />;
-        })}
-        <Polygon points={dataPolygon} fill="#0d9488" fillOpacity={0.35} stroke="#0d9488" strokeWidth={2} />
-        {dataPoints.map(([x, y], i) => (
-          <Circle key={i} cx={x} cy={y} r={3} fill="#0d9488" />
-        ))}
-      </Svg>
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {data.map((d, i) => {
-          const [lx, ly] = pointAt(i, 1.22);
-          return (
-            <Text
-              key={d.subject}
-              style={[
-                styles.radarLabel,
-                { left: lx - 36, top: ly - 8, width: 72, textAlign: 'center' },
-              ]}
-            >
-              {d.subject}
-            </Text>
-          );
-        })}
+    <View style={styles.severityBarRow}>
+      <Text style={styles.severityBarLabel}>{CONDITION_LABELS[condition] ?? condition}</Text>
+      <View style={styles.severityBarTrack}>
+        <View
+          style={[
+            styles.severityBarFill,
+            { width: `${SEVERITY_BAR_PCT[level] ?? 0}%`, backgroundColor: meta.color },
+          ]}
+        />
+      </View>
+      <View style={[styles.severityPill, { backgroundColor: meta.bg }]}>
+        <Text style={[styles.severityPillText, { color: meta.color }]}>{meta.label}</Text>
       </View>
     </View>
   );
@@ -300,11 +265,6 @@ export default function ResultsScreen() {
   const overlayChoices = Object.keys(OVERLAY_META).filter(
     (k) => ((overlays as any)[k]?.length ?? 0) > 0 && selected.includes(k)
   );
-
-  const radarData = Object.entries(severityToShow).map(([condition, level]) => ({
-    subject: CONDITION_LABELS[condition] ?? condition,
-    value: SEVERITY_NUM[level as string] ?? 0,
-  }));
 
   const skinScore = computeSkinScoreFromSeverities(severity);
   const previousScore = computeSkinScoreFromSeverities(previousSeverity);
@@ -537,10 +497,14 @@ export default function ResultsScreen() {
         })}
       </View>
 
-      {radarData.length >= 3 && (
+      {Object.keys(severityToShow).length > 0 && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Severity Overview</Text>
-          <RadarChart data={radarData} />
+          <View style={{ marginTop: 10, gap: 12 }}>
+            {Object.entries(severityToShow).map(([condition, level]) => (
+              <SeverityBar key={condition} condition={condition} level={level as string} />
+            ))}
+          </View>
         </View>
       )}
 
@@ -711,7 +675,10 @@ const styles = StyleSheet.create({
   deltaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   deltaText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
   flag: { fontSize: 11, color: '#d97706', marginTop: 4 },
-  radarLabel: { position: 'absolute', fontSize: 11, color: '#4b5563', fontWeight: '600' },
+  severityBarRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  severityBarLabel: { width: 90, fontSize: 13, color: '#374151' },
+  severityBarTrack: { flex: 1, height: 10, backgroundColor: COLORS.border, borderRadius: 5, overflow: 'hidden' },
+  severityBarFill: { height: '100%', borderRadius: 5 },
   detailsToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' },
   subLabel: { fontSize: 12, fontWeight: '600', color: COLORS.secondaryText, marginBottom: 6 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

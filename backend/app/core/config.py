@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     # Seeded once at startup if the users table is empty
     ADMIN_EMAIL: str = "admin@dermato.local"
     ADMIN_PASSWORD: str = "changeme123"
+    # Login now happens by phone, not email (see auth.login) -- email is kept
+    # on every account for password-reset links/notifications only.
+    ADMIN_PHONE: str = "9999999999"
 
     # Used to build the link inside password-reset emails
     FRONTEND_URL: str = "http://localhost:3000"

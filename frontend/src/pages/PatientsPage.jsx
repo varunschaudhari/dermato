@@ -16,7 +16,7 @@ import FormField from '../components/ui/FormField'
 function CreateAccountForm({ patient, onClose }) {
   const qc = useQueryClient()
   const toast = useToast()
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ phone: '', email: '', password: '' })
   const [error, setError] = useState('')
 
   const mutation = useMutation({
@@ -42,7 +42,17 @@ function CreateAccountForm({ patient, onClose }) {
     >
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
       <div>
-        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Login email for {patient.name}</label>
+        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Login mobile number for {patient.name}</label>
+        <input
+          type="tel"
+          required
+          value={form.phone}
+          onChange={(e) => setForm({ ...form, phone: e.target.value })}
+          className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm focus:border-brand-500"
+        />
+      </div>
+      <div>
+        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Email (for password-reset only)</label>
         <input
           type="email"
           required

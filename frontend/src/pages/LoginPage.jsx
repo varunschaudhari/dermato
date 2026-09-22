@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock } from 'lucide-react'
+import { Phone, Lock } from 'lucide-react'
 import { login as loginApi, getMe } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { homePathFor } from '../utils/roleHome'
@@ -10,7 +10,7 @@ import FormField from '../components/ui/FormField'
 import AuthLayout from '../components/ui/AuthLayout'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -22,7 +22,7 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const { data } = await loginApi(email, password)
+      const { data } = await loginApi(phone, password)
       localStorage.setItem('token', data.access_token)
       const me = await getMe()
       login(data.access_token, me.data)
@@ -41,13 +41,13 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
             <FormField
-              id="login-email"
-              label="Email"
-              icon={Mail}
-              type="email"
+              id="login-phone"
+              label="Mobile number"
+              icon={Phone}
+              type="tel"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
             />
             <FormField
               id="login-password"

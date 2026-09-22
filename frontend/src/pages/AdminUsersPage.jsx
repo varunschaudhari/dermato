@@ -15,7 +15,7 @@ import QueryError from '../components/ui/QueryError'
 export default function AdminUsersPage() {
   const qc = useQueryClient()
   const toast = useToast()
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', role: 'dermatologist' })
+  const [form, setForm] = useState({ full_name: '', phone: '', email: '', password: '', role: 'dermatologist' })
   const [showForm, setShowForm] = useState(false)
   const [error, setError] = useState('')
 
@@ -30,7 +30,7 @@ export default function AdminUsersPage() {
       qc.invalidateQueries(['users'])
       toast.success(`${variables.full_name} added as ${variables.role}.`)
       setShowForm(false)
-      setForm({ full_name: '', email: '', password: '', role: 'dermatologist' })
+      setForm({ full_name: '', phone: '', email: '', password: '', role: 'dermatologist' })
       setError('')
     },
     onError: (err) => setError(err.response?.data?.detail || 'Could not create user'),
@@ -70,6 +70,13 @@ export default function AdminUsersPage() {
               required
               value={form.full_name}
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+            />
+            <FormField
+              label="Mobile number"
+              type="tel"
+              required
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
             <FormField
               label="Email"
@@ -117,7 +124,7 @@ export default function AdminUsersPage() {
             <Card key={u.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {u.full_name} <span className="text-xs text-gray-400 dark:text-gray-500">({u.email})</span>
+                  {u.full_name} <span className="text-xs text-gray-400 dark:text-gray-500">({u.phone || u.email})</span>
                 </p>
                 <div className="flex items-center gap-2 mt-1">
                   <Badge color="brand">{u.role}</Badge>

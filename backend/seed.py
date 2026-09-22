@@ -30,10 +30,13 @@ from app.services.wrinkle_analyzer import WrinkleParams
 DEFAULT_PASSWORD = "password123"
 ADMIN_EMAIL = settings.ADMIN_EMAIL
 ADMIN_PASSWORD = settings.ADMIN_PASSWORD
+ADMIN_PHONE = settings.ADMIN_PHONE
 
+# Login is by phone now (see auth.login) -- email stays on every account for
+# password-reset links/notifications only.
 DERMATOLOGISTS = [
-    {"email": "dr.patel@dermato.local", "full_name": "Dr. Priya Patel"},
-    {"email": "dr.kim@dermato.local", "full_name": "Dr. Steven Kim"},
+    {"phone": "9000000001", "email": "dr.patel@dermato.local", "full_name": "Dr. Priya Patel"},
+    {"phone": "9000000002", "email": "dr.kim@dermato.local", "full_name": "Dr. Steven Kim"},
 ]
 
 PATIENTS = [
@@ -44,8 +47,11 @@ PATIENTS = [
     {"name": "Emma Wilson", "age": 19, "skin_type": "sensitive"},
 ]
 
-# index into PATIENTS -> login email; these two get patient portal accounts
-PATIENT_LOGINS = {0: "alice@patient.local", 2: "carla@patient.local"}
+# index into PATIENTS -> (login phone, email); these two get patient portal accounts
+PATIENT_LOGINS = {
+    0: {"phone": "9000000101", "email": "alice@patient.local"},
+    2: {"phone": "9000000102", "email": "carla@patient.local"},
+}
 
 SEVERITY_LEVELS = ["severe", "moderate", "mild"]
 
@@ -223,9 +229,10 @@ def seed_sessions_for_patient(db, patient, tone: tuple, visits: int) -> None:
         )
 
 
-def _insert_user(db, email, password, full_name, role, patient_id=None):
+def _insert_user(db, phone, email, password, full_name, role, patient_id=None):
     doc = {
         "_id": next_id("users"),
+        "phone": phone,
         "email": email,
         "hashed_password": hash_password(password),
         "full_name": full_name,
@@ -239,10 +246,10 @@ def _insert_user(db, email, password, full_name, role, patient_id=None):
 
 
 def seed(db) -> None:
-    _insert_user(db, ADMIN_EMAIL, ADMIN_PASSWORD, "Default Admin", "admin")
+    _insert_user(db, ADMIN_PHONE, ADMIN_EMAIL, ADMIN_PASSWORD, "Default Admin", "admin")
 
     dermatologists = [
-        _insert_user(db, derm["email"], DEFAULT_PASSWORD, derm["full_name"], "dermatologist")
+        _insert_user(db, derm["phone"], derm["email"], DEFAULT_PASSWORD, derm["full_name"], "dermatologist")
         for derm in DERMATOLOGISTS
     ]
 
@@ -263,16 +270,17 @@ def seed(db) -> None:
         seed_sessions_for_patient(db, patient, SKIN_TONES[i % len(SKIN_TONES)], visits=random.randint(2, 4))
 
         if i in PATIENT_LOGINS:
-            _insert_user(db, PATIENT_LOGINS[i], DEFAULT_PASSWORD, patient.name, "patient", patient_id=patient.id)
+            login = PATIENT_LOGINS[i]
+            _insert_user(db, login["phone"], login["email"], DEFAULT_PASSWORD, patient.name, "patient", patient_id=patient.id)
 
 
 def print_summary() -> None:
-    print("\nSeeded accounts (all staff/patient passwords except admin are: " + DEFAULT_PASSWORD + ")")
-    print(f"  admin          {ADMIN_EMAIL} / {ADMIN_PASSWORD}")
+    print("\nSeeded accounts (login is by PHONE now, not email; all staff/patient passwords except admin are: " + DEFAULT_PASSWORD + ")")
+    print(f"  admin          {ADMIN_PHONE} / {ADMIN_PASSWORD}")
     for derm in DERMATOLOGISTS:
-        print(f"  dermatologist  {derm['email']}")
-    for idx, email in PATIENT_LOGINS.items():
-        print(f"  patient        {email}  (linked to {PATIENTS[idx]['name']})")
+        print(f"  dermatologist  {derm['phone']}  ({derm['email']})")
+    for idx, login in PATIENT_LOGINS.items():
+        print(f"  patient        {login['phone']}  ({login['email']}, linked to {PATIENTS[idx]['name']})")
     print(f"\n{len(PATIENTS)} patients created, {len(PATIENT_LOGINS)} with portal logins.\n")
 
 

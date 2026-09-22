@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { User, Mail, Lock, Calendar } from 'lucide-react'
+import { User, Mail, Phone, Lock, Calendar } from 'lucide-react'
 import { registerPatient, getMe } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import Button from '../components/ui/Button'
@@ -11,7 +11,7 @@ import AuthLayout from '../components/ui/AuthLayout'
 const SKIN_TYPES = ['Normal', 'Dry', 'Oily', 'Combination', 'Sensitive']
 
 export default function PatientRegisterPage() {
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', age: '', skin_type: '' })
+  const [form, setForm] = useState({ full_name: '', phone: '', email: '', password: '', age: '', skin_type: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
@@ -46,6 +46,15 @@ export default function PatientRegisterPage() {
             required
             value={form.full_name}
             onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+          />
+          <FormField
+            id="pr-phone"
+            label="Mobile number"
+            icon={Phone}
+            type="tel"
+            required
+            value={form.phone}
+            onChange={(e) => setForm({ ...form, phone: e.target.value })}
           />
           <FormField
             id="pr-email"

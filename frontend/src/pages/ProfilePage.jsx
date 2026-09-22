@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import { KeyRound, Mail, User as UserIcon } from 'lucide-react'
+import { KeyRound, Mail, Phone, User as UserIcon } from 'lucide-react'
 import { updateMe, changePassword } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuth()
   const toast = useToast()
 
-  const [profileForm, setProfileForm] = useState({ full_name: user.full_name || '', email: user.email })
+  const [profileForm, setProfileForm] = useState({ full_name: user.full_name || '', phone: user.phone || '', email: user.email })
   const [profileError, setProfileError] = useState('')
 
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '' })
@@ -69,6 +69,14 @@ export default function ProfilePage() {
             required
             value={profileForm.full_name}
             onChange={(e) => setProfileForm({ ...profileForm, full_name: e.target.value })}
+          />
+          <FormField
+            label="Mobile number"
+            icon={Phone}
+            type="tel"
+            required
+            value={profileForm.phone}
+            onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
           />
           <FormField
             label="Email"
