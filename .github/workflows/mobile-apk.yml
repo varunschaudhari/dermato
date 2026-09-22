@@ -1,0 +1,55 @@
+name: Mobile APK (manual)
+
+# On-demand build for handing testers an installable APK — not part of the
+# regular CI/CD pipeline, so it only runs when someone triggers it from the
+# Actions tab (Run workflow).
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: DermatoMobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: DermatoMobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # Best-effort — GitHub's Android image usually already has these, but
+      # this covers a compileSdk/build-tools/ndk version the image hasn't
+      # picked up yet. Gradle will fetch anything still missing on its own.
+      - name: Pre-fetch the exact Android SDK packages this project pins
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          yes | sdkmanager "platforms;android-37" "build-tools;37.0.0" "ndk;27.1.12297006" || true
+
+      # assembleRelease (not assembleDebug): the debug build variant expects
+      # a Metro server running alongside it and won't run standalone on a
+      # tester's phone. Release bundles the JS into the APK. This project's
+      # release build type is still signed with the bundled debug keystore
+      # (see android/app/build.gradle) — no separate signing key needed for
+      # an ad-hoc test build.
+      - name: Build release APK
+        working-directory: DermatoMobile/android
+        run: ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: dermato-mobile-apk
+          path: DermatoMobile/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
