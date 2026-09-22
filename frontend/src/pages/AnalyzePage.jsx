@@ -5,9 +5,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   UploadCloud, Camera, ScanFace, Users,
   CheckCircle2, RotateCcw, ScanLine, TrendingUp, Image as ImageIcon, X, Aperture, Plus,
-  SwitchCamera, Zap, ZapOff, Timer, ClipboardList,
+  SwitchCamera, Zap, ZapOff, Timer, ClipboardList, AlertTriangle,
 } from 'lucide-react'
-import { analyzeImage, getPatients, getPatientSessions, getPatient, updateSkinHistory } from '../services/api'
+import { analyzeImage, checkQuality, getPatients, getPatientSessions, getPatient, updateSkinHistory } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { compressImage } from '../utils/compressImage'
@@ -93,6 +93,10 @@ export default function AnalyzePage() {
   const [isQualityError, setIsQualityError] = useState(false)
   const [showCaptureChoice, setShowCaptureChoice] = useState(false)
   const [showReview, setShowReview] = useState(false)
+  // 'idle' | 'checking' | 'ok' | 'failed' | 'inconclusive' (network/timeout —
+  // not treated as a bad photo, since the real /analyze call is still the
+  // final authority; see checkQuality's comment in services/api.js).
+  const [qualityCheck, setQualityCheck] = useState({ status: 'idle', message: '' })
   const [cameraOpen, setCameraOpen] = useState(false)
   const [qualityHintText, setQualityHintText] = useState(null)
   const [facingMode, setFacingMode] = useState('environment')
@@ -165,6 +169,33 @@ export default function AnalyzePage() {
     const timer = setTimeout(() => setJustCaptured(false), 1200)
     return () => clearTimeout(timer)
   }, [justCaptured])
+
+  // Runs the real quality gate against the front photo as soon as the review
+  // sheet opens, so a bad photo (blurry, too dark, no skin detected) surfaces
+  // here instead of only after the full upload+AI /analyze round-trip.
+  useEffect(() => {
+    if (!showReview || !file) return
+    let cancelled = false
+    setQualityCheck({ status: 'checking', message: '' })
+    checkQuality(file)
+      .then(() => {
+        if (!cancelled) setQualityCheck({ status: 'ok', message: '' })
+      })
+      .catch((err) => {
+        if (cancelled) return
+        const detail = err.response?.data?.detail
+        if (detail && typeof detail === 'object' && detail.message) {
+          setQualityCheck({ status: 'failed', message: detail.message })
+        } else {
+          // No response (network/timeout) or an unrelated server error —
+          // inconclusive, not a verdict on the photo. Don't block on it.
+          setQualityCheck({ status: 'inconclusive', message: '' })
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [showReview, file])
 
   const processFile = useCallback(async (original, angle) => {
     if (!original) return
@@ -503,7 +534,7 @@ export default function AnalyzePage() {
             <div className="space-y-2">
               <button
                 type="button"
-                onClick={openCamera}
+                onClick={() => openCamera()}
                 className="flex items-center gap-3 w-full px-4 py-3 rounded-xl bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300 font-medium text-sm"
               >
                 <Camera className="w-5 h-5" />
@@ -719,17 +750,48 @@ export default function AnalyzePage() {
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">
               This estimates severity to help you decide next steps. It does not diagnose melanoma, cancer, or any medical condition.
             </p>
-            <Button
-              onClick={() => {
-                setShowReview(false)
-                handleAnalyze()
-              }}
-              fullWidth
-              icon={ScanFace}
-              className="py-3"
-            >
-              Looks good — Analyze
-            </Button>
+
+            {qualityCheck.status === 'checking' && (
+              <div className="flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400 mb-4">
+                <div className="w-3.5 h-3.5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                Checking photo quality…
+              </div>
+            )}
+
+            {qualityCheck.status === 'failed' && (
+              <div className="flex items-start gap-2 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 text-xs rounded-xl px-3 py-2.5 mb-4">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{qualityCheck.message}</span>
+              </div>
+            )}
+
+            {qualityCheck.status === 'failed' ? (
+              <Button
+                onClick={() => {
+                  setShowReview(false)
+                  removePhoto('front')
+                  openCaptureChoice('front')
+                }}
+                fullWidth
+                icon={Camera}
+                className="py-3"
+              >
+                Retake Photo
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  setShowReview(false)
+                  handleAnalyze()
+                }}
+                disabled={qualityCheck.status === 'checking'}
+                fullWidth
+                icon={ScanFace}
+                className="py-3"
+              >
+                Looks good — Analyze
+              </Button>
+            )}
             <button
               type="button"
               onClick={() => setShowReview(false)}

@@ -59,6 +59,17 @@ export const analyzeImage = (formData, onUploadProgress) =>
     onUploadProgress,
   })
 
+// Runs the exact same gate /analyze itself uses (quality_gate.py) against just
+// the front photo, without the expensive analyzers — fast enough to check
+// right after capture, before the user commits to a full analysis submit.
+export const checkQuality = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/analysis/quality-check', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
 export const getPatients = () => api.get('/patients/')
 export const createPatient = (data) => api.post('/patients/', data)
 export const getPatient = (id) => api.get(`/patients/${id}`)

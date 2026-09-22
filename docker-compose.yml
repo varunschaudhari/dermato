@@ -24,6 +24,14 @@ services:
       - SECRET_KEY=${SECRET_KEY:-dev-insecure-secret-change-me}
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@dermato.local}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme123}
+      - ADMIN_PHONE=${ADMIN_PHONE:-9999999999}
+      # Leave unset to log reset/reminder emails to the container's logs
+      # instead of sending them (see mailer.py) -- fine for local dev.
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-no-reply@dermato.local}
     depends_on:
       - mongo
 

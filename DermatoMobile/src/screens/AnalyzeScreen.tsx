@@ -48,6 +48,20 @@ export default function AnalyzeScreen() {
 
   const pickFrom = async (source: 'camera' | 'gallery') => {
     const result = source === 'camera' ? await launchCamera({ mediaType: 'photo', quality: 0.8 }) : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+    // Both didCancel and errorCode leave `assets` empty -- without checking
+    // these first, a denied permission or a camera-less device (e.g. some
+    // emulators) looked identical to the button doing nothing at all.
+    if (result.didCancel) return;
+    if (result.errorCode) {
+      setError(
+        result.errorCode === 'camera_unavailable'
+          ? 'No camera available on this device.'
+          : result.errorCode === 'permission'
+          ? 'Camera permission was denied. Enable it in your device settings to take a photo.'
+          : result.errorMessage || 'Could not open the camera.'
+      );
+      return;
+    }
     const asset = result.assets?.[0];
     if (asset) {
       setPhoto(asset);
