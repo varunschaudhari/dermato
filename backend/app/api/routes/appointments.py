@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core.security import get_current_user
 from app.db.database import get_db, next_id, to_ns
 from app.schemas import AppointmentCreate, AppointmentOut, AppointmentStatusUpdate, DoctorOption
+from app.services.notifier import notify_user
 
 router = APIRouter()
 
@@ -79,17 +80,13 @@ def create_appointment(payload: AppointmentCreate, db=Depends(get_db), current_u
     }
     db.appointments.insert_one(doc)
 
-    db.notifications.insert_one(
-        {
-            "_id": next_id("notifications"),
-            "user_id": doctor["_id"],
-            "type": "appointment_booked",
-            "message": f"New appointment booked for {payload.scheduled_at:%b %d, %I:%M %p}",
-            "link": "/appointments",
-            "related_id": doc["_id"],
-            "is_read": False,
-            "created_at": datetime.utcnow(),
-        }
+    notify_user(
+        db,
+        doctor["_id"],
+        "appointment_booked",
+        f"New appointment booked for {payload.scheduled_at:%b %d, %I:%M %p}",
+        "/appointments",
+        related_id=doc["_id"],
     )
 
     return to_ns(_enrich(db, doc))

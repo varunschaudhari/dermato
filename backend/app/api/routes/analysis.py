@@ -16,6 +16,7 @@ from app.services import preprocessor, quality_gate, acne_analyzer, pigmentation
 from app.services.severity_classifier import classify_acne, classify_pigmentation, classify_wrinkle, classify_pore
 from app.services.recommendation_engine import get_recommendations
 from app.services.treatment_tracker import compute_effective_severity, update_treatment_plan
+from app.services.notifier import notify_user
 
 # backend/training/inference.py is a sibling of backend/app/, not a sub-package of it
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -270,17 +271,13 @@ async def analyze_image(
         if resolved_plan:
             previous_severities[condition] = resolved_plan.severity_at_start
             if resolved_plan.outcome == "worsened" and patient.assigned_doctor_id:
-                db.notifications.insert_one(
-                    {
-                        "_id": next_id("notifications"),
-                        "user_id": patient.assigned_doctor_id,
-                        "type": "severity_worsened",
-                        "message": f"{patient.name}'s {condition} got worse since the last check",
-                        "link": f"/progress/{patient_id}",
-                        "related_id": session.id,
-                        "is_read": False,
-                        "created_at": datetime.utcnow(),
-                    }
+                notify_user(
+                    db,
+                    patient.assigned_doctor_id,
+                    "severity_worsened",
+                    f"{patient.name}'s {condition} got worse since the last check",
+                    f"/progress/{patient_id}",
+                    related_id=session.id,
                 )
 
     return {

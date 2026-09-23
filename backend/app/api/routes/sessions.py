@@ -1,9 +1,8 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, HTTPException
 from app.core.security import get_current_user, require_role
-from app.db.database import get_db, next_id, to_ns
+from app.db.database import get_db, to_ns
 from app.schemas import DoctorNoteUpdate, PatientNoteUpdate, SessionOut
+from app.services.notifier import notify_user
 
 router = APIRouter()
 
@@ -51,17 +50,13 @@ def update_doctor_note(
 
     patient_user = db.users.find_one({"patient_id": session["patient_id"], "role": "patient"})
     if patient_user:
-        db.notifications.insert_one(
-            {
-                "_id": next_id("notifications"),
-                "user_id": patient_user["_id"],
-                "type": "doctor_note",
-                "message": f"{current_user.full_name} left a note on your {session['captured_at']:%b %d} check",
-                "link": f"/progress/{session['patient_id']}",
-                "related_id": session_id,
-                "is_read": False,
-                "created_at": datetime.utcnow(),
-            }
+        notify_user(
+            db,
+            patient_user["_id"],
+            "doctor_note",
+            f"{current_user.full_name} left a note on your {session['captured_at']:%b %d} check",
+            f"/progress/{session['patient_id']}",
+            related_id=session_id,
         )
 
     return to_ns(db.sessions.find_one({"_id": session_id}))

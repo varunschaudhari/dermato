@@ -29,8 +29,11 @@ def _compare_severity(start: str, end: str) -> str:
 
 def compute_effective_severity(db, patient_id: int, condition: str, detected_severity: str):
     """If the two most recently resolved plans for this condition both failed to improve,
-    bump the recommendation tier one level. This only affects which remedy gets recommended —
-    the detected severity stored on the session is always the honest, unadjusted reading.
+    bump the recommendation tier one level. A plan the patient explicitly marked as not
+    followed (adherence == "not_followed") doesn't count toward this -- a remedy that was
+    never tried isn't evidence the remedy itself doesn't work. This only affects which
+    remedy gets recommended -- the detected severity stored on the session is always the
+    honest, unadjusted reading.
     Returns (effective_severity, escalated: bool).
     """
     recent = list(
@@ -40,7 +43,9 @@ def compute_effective_severity(db, patient_id: int, condition: str, detected_sev
         .sort("resolved_at", -1)
         .limit(2)
     )
-    failed_twice = len(recent) == 2 and all(p.get("outcome") in ("unchanged", "worsened") for p in recent)
+    failed_twice = len(recent) == 2 and all(
+        p.get("outcome") in ("unchanged", "worsened") and p.get("adherence") != "not_followed" for p in recent
+    )
     if not failed_twice:
         return detected_severity, False
 
@@ -89,6 +94,7 @@ def update_treatment_plan(db, patient_id: int, condition: str, session, severity
         "resolved_at": None,
         "outcome_severity": None,
         "outcome": None,
+        "adherence": None,
         "reminder_sent_at": None,
     }
     db.treatment_plans.insert_one(new_plan_doc)

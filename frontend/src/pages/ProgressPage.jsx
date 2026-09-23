@@ -3,7 +3,7 @@ import { useParams, useLocation, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
 import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2 } from 'lucide-react'
-import { getPatient, getPatientSessions, getTreatmentPlans, updateDoctorNote, updateSkinHistory, exportPatientData, deletePatient } from '../services/api'
+import { getPatient, getPatientSessions, getTreatmentPlans, updateDoctorNote, updateTreatmentAdherence, updateSkinHistory, exportPatientData, deletePatient } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
@@ -32,7 +32,42 @@ const OUTCOME_META = {
   worsened: { color: 'red', icon: ArrowUpRight, label: 'Worsened' },
 }
 
-function TreatmentPlans({ plans }) {
+const ADHERENCE_LABELS = {
+  followed: 'You said: Followed it',
+  partial: 'You said: Partially followed it',
+  not_followed: "You said: Didn't follow it",
+}
+
+function AdherenceCheckIn({ plan, patientId }) {
+  const qc = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: (adherence) => updateTreatmentAdherence(patientId, plan.id, adherence),
+    onSuccess: () => qc.invalidateQueries(['treatment-plans', patientId]),
+  })
+
+  if (plan.adherence) {
+    return <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">{ADHERENCE_LABELS[plan.adherence]}</p>
+  }
+
+  return (
+    <div className="mt-2">
+      <p className="text-xs text-gray-600 dark:text-gray-400 mb-1.5">Did you follow this treatment?</p>
+      <div className="flex gap-1.5">
+        <Button size="sm" variant="outline" onClick={() => mutation.mutate('followed')} disabled={mutation.isPending}>
+          Yes
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => mutation.mutate('partial')} disabled={mutation.isPending}>
+          Partially
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => mutation.mutate('not_followed')} disabled={mutation.isPending}>
+          No
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+function TreatmentPlans({ plans, patientId, isPatient }) {
   if (plans.length === 0) {
     return (
       <Card>
@@ -94,6 +129,7 @@ function TreatmentPlans({ plans }) {
                       </span>
                     </div>
                   )}
+                  {isPatient && <AdherenceCheckIn plan={active} patientId={patientId} />}
                 </div>
               )}
 
@@ -772,7 +808,7 @@ export default function ProgressPage() {
           {activeTab === 'treatment' && (
             <>
               <div id="treatment-plans">
-                <TreatmentPlans plans={plans} />
+                <TreatmentPlans plans={plans} patientId={patientId} isPatient={user.role === 'patient'} />
               </div>
               {patient && <SkinHistory patient={patient} canEdit={canEditHistory} />}
             </>

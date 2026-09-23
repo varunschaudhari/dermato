@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.security import get_current_user, hash_password, require_role
 from app.db.database import get_db, next_id, to_ns
 from app.schemas import (
+    AdherenceUpdate,
     AssignDoctorRequest,
     ImportResult,
     MessageCreate,
@@ -21,6 +22,7 @@ from app.schemas import (
     TreatmentPlanOut,
     UserOut,
 )
+from app.services.notifier import notify_user
 
 router = APIRouter()
 
@@ -227,6 +229,33 @@ def get_treatment_plans(patient_id: int, db=Depends(get_db), current_user=Depend
     return [to_ns(p) for p in plans]
 
 
+@router.patch("/{patient_id}/treatment-plans/{plan_id}/adherence", response_model=TreatmentPlanOut)
+def update_treatment_adherence(
+    patient_id: int,
+    plan_id: int,
+    payload: AdherenceUpdate,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """A patient's own self-report on whether they followed their active remedy --
+    feeds compute_effective_severity's escalation gate (treatment_tracker.py) so a
+    plan the patient says they never tried doesn't get mistaken for a remedy that
+    failed. Self-report only: no doctor path, mirroring update_patient_note in
+    sessions.py. Restricted to the active plan -- once a plan resolves into history
+    its fields are immutable like every other outcome field."""
+    if current_user.role != "patient" or current_user.patient_id != patient_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this treatment plan")
+    if payload.adherence not in ("followed", "partial", "not_followed"):
+        raise HTTPException(status_code=400, detail="Invalid adherence value")
+
+    plan = db.treatment_plans.find_one({"_id": plan_id, "patient_id": patient_id, "status": "active"})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Active treatment plan not found")
+
+    db.treatment_plans.update_one({"_id": plan_id}, {"$set": {"adherence": payload.adherence}})
+    return to_ns(db.treatment_plans.find_one({"_id": plan_id}))
+
+
 @router.post(
     "/{patient_id}/account",
     response_model=UserOut,
@@ -297,18 +326,7 @@ def send_message(
         notify_message = f"{current_user.full_name} sent you a message"
 
     if notify_user_id:
-        db.notifications.insert_one(
-            {
-                "_id": next_id("notifications"),
-                "user_id": notify_user_id,
-                "type": "new_message",
-                "message": notify_message,
-                "link": f"/progress/{patient_id}",
-                "related_id": doc["_id"],
-                "is_read": False,
-                "created_at": datetime.utcnow(),
-            }
-        )
+        notify_user(db, notify_user_id, "new_message", notify_message, f"/progress/{patient_id}", related_id=doc["_id"])
 
     return to_ns(doc)
 

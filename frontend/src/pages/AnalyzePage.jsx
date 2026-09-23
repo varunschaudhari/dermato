@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   UploadCloud, Camera, ScanFace, Users,
   CheckCircle2, RotateCcw, ScanLine, TrendingUp, Image as ImageIcon, X, Aperture, Plus,
-  SwitchCamera, Zap, ZapOff, Timer, ClipboardList, AlertTriangle,
+  SwitchCamera, Zap, ZapOff, Timer, ClipboardList, AlertTriangle, Lightbulb,
 } from 'lucide-react'
 import { analyzeImage, checkQuality, getPatients, getPatientSessions, getPatient, updateSkinHistory } from '../services/api'
 import { useAuth } from '../context/AuthContext'
@@ -50,6 +50,16 @@ const HOW_IT_WORKS = [
   { icon: Camera, label: 'Capture', description: 'Take or upload a clear skin photo' },
   { icon: ScanLine, label: 'Analyze', description: 'AI checks it against your selected conditions' },
   { icon: TrendingUp, label: 'Track', description: 'See severity and progress over time' },
+]
+
+// General good-practice guidance, not a precise measured protocol — there's
+// no documented/enforced capture distance anywhere in this app (checked the
+// project's own spec docs and both capture UIs), so this deliberately stays
+// qualitative rather than inventing a specific number like "15cm away".
+const CAPTURE_TIPS = [
+  'Get close — fill the frame with the area you want checked, not your whole face.',
+  'Use even daylight or bright indoor light; avoid harsh shadows or backlight.',
+  'Hold steady and keep the camera parallel to your skin.',
 ]
 
 const ANGLES = [
@@ -429,6 +439,17 @@ export default function AnalyzePage() {
         </Card>
       )}
 
+      <Card className="mb-5 bg-amber-50/60 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/40">
+        <div className="flex items-start gap-2.5">
+          <Lightbulb className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+          <ul className="text-xs text-gray-600 dark:text-gray-300 space-y-1">
+            {CAPTURE_TIPS.map((tip) => (
+              <li key={tip}>{tip}</li>
+            ))}
+          </ul>
+        </div>
+      </Card>
+
       <div
         {...getRootProps({
           onClick: () => {
@@ -583,12 +604,14 @@ export default function AnalyzePage() {
         <div className="fixed inset-0 z-50 bg-black flex flex-col overflow-hidden">
           <video ref={videoRef} autoPlay playsInline muted className="flex-1 w-full h-full object-cover" />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+            {/* Square guide, not a face outline — this app reads best from a
+                close-up of one skin area, not a framed whole-face portrait. */}
             <div
-              className="w-[68%] aspect-[3/4] max-h-[60%] rounded-[50%] border-2 border-white"
+              className="w-[72%] aspect-square max-h-[60%] rounded-2xl border-2 border-white"
               style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.55)' }}
             />
             <p className="mt-4 text-white text-sm font-medium bg-black/40 px-3 py-1 rounded-full">
-              Fit your face inside the outline
+              Get close — fill the square with the skin area you want checked
             </p>
           </div>
 

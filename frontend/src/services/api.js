@@ -83,6 +83,8 @@ export const updateDoctorNote = (sessionId, note) => api.patch(`/sessions/${sess
 export const updatePatientNote = (sessionId, note) => api.patch(`/sessions/${sessionId}/patient-note`, { note })
 export const getAnalyticsSummary = () => api.get('/analytics/summary')
 export const getTreatmentPlans = (patientId) => api.get(`/patients/${patientId}/treatment-plans`)
+export const updateTreatmentAdherence = (patientId, planId, adherence) =>
+  api.patch(`/patients/${patientId}/treatment-plans/${planId}/adherence`, { adherence })
 export const updateSkinHistory = (patientId, data) => api.patch(`/patients/${patientId}/skin-history`, data)
 export const getOverdueRecheck = () => api.get('/patients/overdue-recheck')
 export const deletePatient = (patientId) => api.delete(`/patients/${patientId}`)

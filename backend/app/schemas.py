@@ -125,6 +125,15 @@ class TreatmentPlanOut(BaseModel):
     resolved_at: Optional[datetime] = None
     outcome_severity: Optional[str] = None
     outcome: Optional[str] = None
+    adherence: Optional[str] = None
+
+
+class AdherenceUpdate(BaseModel):
+    adherence: str
+
+
+class PushTokenUpdate(BaseModel):
+    token: str
 
 
 class UserCreate(BaseModel):

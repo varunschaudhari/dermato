@@ -83,6 +83,10 @@ export const login = (phone: string, password: string) => {
 
 export const getMe = () => api.get('/auth/me');
 
+export const registerPushToken = (token: string) => api.post('/auth/me/push-token', { token });
+
+export const clearPushToken = () => api.delete('/auth/me/push-token');
+
 export interface RegisterPatientPayload {
   phone: string;
   email: string;
@@ -152,6 +156,7 @@ export interface TreatmentPlanOut {
   status: 'active' | 'resolved';
   outcome_severity?: Severity | null;
   outcome?: 'improved' | 'unchanged' | 'worsened' | null;
+  adherence?: 'followed' | 'partial' | 'not_followed' | null;
 }
 
 export const getPatientSessions = (patientId: number) =>
@@ -159,6 +164,12 @@ export const getPatientSessions = (patientId: number) =>
 
 export const getTreatmentPlans = (patientId: number) =>
   api.get<TreatmentPlanOut[]>(`/patients/${patientId}/treatment-plans`);
+
+export const updateTreatmentAdherence = (
+  patientId: number,
+  planId: number,
+  adherence: 'followed' | 'partial' | 'not_followed'
+) => api.patch<TreatmentPlanOut>(`/patients/${patientId}/treatment-plans/${planId}/adherence`, { adherence });
 
 export const updatePatientNote = (sessionId: number, note: string) =>
   api.patch<SessionOut>(`/sessions/${sessionId}/patient-note`, { note });

@@ -9,6 +9,7 @@ import {
   getTreatmentPlans,
   getPatient,
   updateSkinHistory,
+  updateTreatmentAdherence,
   absoluteUrl,
   SessionOut,
   TreatmentPlanOut,
@@ -191,6 +192,55 @@ const OUTCOME_META: Record<string, { color: string; label: string }> = {
   worsened: { color: '#dc2626', label: 'Worsened' },
 };
 
+const ADHERENCE_LABELS: Record<string, string> = {
+  followed: 'You said: Followed it',
+  partial: 'You said: Partially followed it',
+  not_followed: "You said: Didn't follow it",
+};
+
+function AdherenceCheckIn({
+  plan,
+  patientId,
+  onUpdated,
+}: {
+  plan: TreatmentPlanOut;
+  patientId: number;
+  onUpdated: (planId: number, adherence: 'followed' | 'partial' | 'not_followed') => void;
+}) {
+  const [saving, setSaving] = useState(false);
+
+  if (plan.adherence) {
+    return <Text style={styles.adherenceAnswer}>{ADHERENCE_LABELS[plan.adherence]}</Text>;
+  }
+
+  const answer = async (value: 'followed' | 'partial' | 'not_followed') => {
+    setSaving(true);
+    try {
+      await updateTreatmentAdherence(patientId, plan.id, value);
+      onUpdated(plan.id, value);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View style={styles.adherencePrompt}>
+      <Text style={styles.adherenceLabel}>Did you follow this treatment?</Text>
+      <View style={styles.adherenceRow}>
+        <TouchableOpacity style={styles.adherenceChip} disabled={saving} onPress={() => answer('followed')}>
+          <Text style={styles.adherenceChipText}>Yes</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.adherenceChip} disabled={saving} onPress={() => answer('partial')}>
+          <Text style={styles.adherenceChipText}>Partially</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.adherenceChip} disabled={saving} onPress={() => answer('not_followed')}>
+          <Text style={styles.adherenceChipText}>No</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
+
 export default function ProgressScreen() {
   const { patientId } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -221,6 +271,10 @@ export default function ProgressScreen() {
   }, [patientId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleAdherenceUpdated = (planId: number, adherence: 'followed' | 'partial' | 'not_followed') => {
+    setPlans((prev) => prev.map((p) => (p.id === planId ? { ...p, adherence } : p)));
+  };
 
   return (
     <ScrollView
@@ -284,6 +338,9 @@ export default function ProgressScreen() {
                             Day {progress.elapsedDays} of {progress.totalDays}
                           </Text>
                         </View>
+                      )}
+                      {p.status === 'active' && patientId != null && (
+                        <AdherenceCheckIn plan={p} patientId={patientId} onUpdated={handleAdherenceUpdated} />
                       )}
                       {p.status === 'resolved' && p.severity_at_start && p.outcome_severity && (
                         <View style={styles.transitionRow}>
@@ -372,4 +429,10 @@ const styles = StyleSheet.create({
   compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider },
   compareDateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   compareDateText: { fontSize: 11, color: COLORS.mutedGray },
+  adherencePrompt: { marginTop: 8, width: '100%' },
+  adherenceLabel: { fontSize: 11, color: COLORS.mutedGray, marginBottom: 6 },
+  adherenceRow: { flexDirection: 'row', gap: 6 },
+  adherenceChip: { borderWidth: 1, borderColor: COLORS.teal, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  adherenceChipText: { color: COLORS.teal, fontWeight: '600', fontSize: 11 },
+  adherenceAnswer: { fontSize: 11, color: COLORS.mutedGray, marginTop: 6, width: '100%' },
 });

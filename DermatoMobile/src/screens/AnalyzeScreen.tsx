@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { Lightbulb } from 'lucide-react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -8,6 +9,16 @@ import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client'
 import { COLORS } from '../constants';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
+
+// General good-practice guidance, not a precise measured protocol -- there's
+// no documented/enforced capture distance anywhere in this app (checked the
+// project's own spec docs and both capture UIs), so this deliberately stays
+// qualitative rather than inventing a specific number like "15cm away".
+const CAPTURE_TIPS = [
+  'Get close -- fill the frame with the area you want checked, not your whole face.',
+  'Use even daylight or bright indoor light; avoid harsh shadows or backlight.',
+  'Hold steady and keep the camera parallel to your skin.',
+];
 
 // Results lives in the root Stack (a sibling of MainTabs), not inside the tab
 // navigator Analyze belongs to — navigate() still finds it by bubbling up to
@@ -100,6 +111,15 @@ export default function AnalyzeScreen() {
       </View>
       <Text style={styles.subtitle}>{fullName ? `Hi ${fullName.split(' ')[0]} — ` : ''}Upload a clear, well-lit photo to get started</Text>
 
+      <View style={styles.tipsBox}>
+        <Lightbulb size={16} color="#d97706" style={styles.tipsIcon} />
+        <View style={styles.tipsTextWrap}>
+          {CAPTURE_TIPS.map((tip) => (
+            <Text key={tip} style={styles.tipsText}>{tip}</Text>
+          ))}
+        </View>
+      </View>
+
       <View style={styles.photoBox}>
         {photo ? (
           <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel="Selected photo preview" />
@@ -168,7 +188,11 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
-  subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 20 },
+  subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 16 },
+  tipsBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, padding: 12, marginBottom: 16 },
+  tipsIcon: { marginTop: 2 },
+  tipsTextWrap: { flex: 1, gap: 3 },
+  tipsText: { fontSize: 12, color: '#4b5563', lineHeight: 17 },
   photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 12, overflow: 'hidden', position: 'relative' },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   photoPlaceholder: { color: COLORS.mutedGray, fontSize: 13 },

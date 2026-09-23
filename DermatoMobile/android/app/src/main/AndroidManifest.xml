@@ -1,6 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Push notifications: on Android 13+ (API 33+) the app must request this
+         at runtime via PermissionsAndroid before it can display a notification;
+         see src/services/pushNotifications.ts. Unlike CAMERA below, this one
+         genuinely is the library's documented contract, not a footgun. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Deliberately NOT requesting android.permission.CAMERA: this app only ever
          calls react-native-image-picker's launchCamera(), which delegates to the
          system camera app via an implicit Intent when this permission is absent

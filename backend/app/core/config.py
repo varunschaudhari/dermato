@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     # date has arrived (see app/services/reminder_scheduler.py)
     REMINDER_CHECK_INTERVAL_MINUTES: int = 60
 
+    # Path to a Firebase service-account JSON key, used to send push notifications
+    # to the mobile app (see app/services/push_sender.py). Leave empty for local
+    # dev -- pushes are logged to the console instead of sent, same as SMTP_HOST.
+    FIREBASE_CREDENTIALS_PATH: str = ""
+
     # Comma-separated list of allowed CORS origins
     CORS_ORIGINS: str = "http://localhost:3000"
 

@@ -66,6 +66,11 @@ yarn-error.log
 # testing
 /coverage
 
+# Firebase (push notifications) -- project-specific, downloaded from your own
+# Firebase console, never committed. See push-notifications setup notes.
+android/app/google-services.json
+ios/GoogleService-Info.plist
+
 # Yarn
 .yarn/*
 !.yarn/patches

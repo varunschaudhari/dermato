@@ -4,8 +4,9 @@ import traceback
 from datetime import datetime
 
 from app.core.config import settings
-from app.db.database import get_db, next_id
+from app.db.database import get_db
 from app.services.mailer import send_recheck_reminder_email
+from app.services.notifier import notify_user
 
 
 def send_due_recheck_reminders(db) -> int:
@@ -36,18 +37,14 @@ def send_due_recheck_reminders(db) -> int:
             continue
 
         link = f"{settings.FRONTEND_URL}/analyze"
-        db.notifications.insert_one(
-            {
-                "_id": next_id("notifications"),
-                "user_id": patient_user["_id"],
-                "type": "recheck_due",
-                "message": f"Time for your {plan['condition']} recheck — it's been "
-                f"{plan.get('duration_weeks') or 'a while'} weeks since your last scan.",
-                "link": "/analyze",
-                "related_id": plan["_id"],
-                "is_read": False,
-                "created_at": now,
-            }
+        notify_user(
+            db,
+            patient_user["_id"],
+            "recheck_due",
+            f"Time for your {plan['condition']} recheck — it's been "
+            f"{plan.get('duration_weeks') or 'a while'} weeks since your last scan.",
+            "/analyze",
+            related_id=plan["_id"],
         )
         send_recheck_reminder_email(patient_user["email"], patient["name"], plan["condition"], link)
 

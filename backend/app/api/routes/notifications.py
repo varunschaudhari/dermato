@@ -3,8 +3,9 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.security import get_current_user
-from app.db.database import get_db, next_id, to_ns
+from app.db.database import get_db, to_ns
 from app.schemas import NotificationOut
+from app.services.notifier import notify_user
 
 router = APIRouter()
 
@@ -38,17 +39,13 @@ def _sync_overdue_recheck_notifications(db, current_user) -> None:
         if exists:
             continue
 
-        db.notifications.insert_one(
-            {
-                "_id": next_id("notifications"),
-                "user_id": current_user.id,
-                "type": "recheck_overdue",
-                "message": f"{patient['name']}'s {plan['condition']} recheck is overdue",
-                "link": f"/progress/{patient['_id']}",
-                "related_id": plan["_id"],
-                "is_read": False,
-                "created_at": datetime.utcnow(),
-            }
+        notify_user(
+            db,
+            current_user.id,
+            "recheck_overdue",
+            f"{patient['name']}'s {plan['condition']} recheck is overdue",
+            f"/progress/{patient['_id']}",
+            related_id=plan["_id"],
         )
 
 

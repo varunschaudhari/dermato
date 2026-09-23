@@ -20,6 +20,7 @@ from app.schemas import (
     PasswordResetConfirm,
     PasswordResetRequest,
     PatientSelfRegister,
+    PushTokenUpdate,
     Token,
     UserCreate,
     UserOut,
@@ -152,6 +153,23 @@ def give_consent(db=Depends(get_db), current_user=Depends(get_current_user)):
     account — the frontend gates self-service analysis behind this."""
     db.users.update_one({"_id": current_user.id}, {"$set": {"consent_given_at": datetime.utcnow()}})
     return to_ns(db.users.find_one({"_id": current_user.id}))
+
+
+@router.post("/me/push-token")
+def register_push_token(payload: PushTokenUpdate, db=Depends(get_db), current_user=Depends(get_current_user)):
+    """Stores this device's FCM registration token so notify_user (notifier.py)
+    can push to it. Self-service only -- the mobile app calls this right after
+    login/registration (see AuthContext.loginWithToken on the mobile side)."""
+    db.users.update_one({"_id": current_user.id}, {"$set": {"push_token": payload.token}})
+    return {"detail": "Push token registered"}
+
+
+@router.delete("/me/push-token")
+def clear_push_token(db=Depends(get_db), current_user=Depends(get_current_user)):
+    """Called on logout so a shared/reset device doesn't keep receiving the
+    previous user's pushes."""
+    db.users.update_one({"_id": current_user.id}, {"$set": {"push_token": None}})
+    return {"detail": "Push token cleared"}
 
 
 @router.post("/me/password")

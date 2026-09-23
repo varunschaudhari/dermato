@@ -117,3 +117,11 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+// Push notifications (@react-native-firebase/*, autolinked above) need this
+// plugin to process google-services.json into Firebase config at build time.
+// Applied conditionally so the app still builds for anyone without a Firebase
+// project set up yet -- see DermatoMobile push-notifications setup notes.
+if (file("google-services.json").exists()) {
+    apply plugin: "com.google.gms.google-services"
+}

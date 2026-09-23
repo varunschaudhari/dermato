@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as loginApi, getMe } from '../api/client';
+import { login as loginApi, getMe, clearPushToken } from '../api/client';
+import { registerForPushNotifications } from '../services/pushNotifications';
 
 interface AuthState {
   loading: boolean;
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data } = await getMe();
           setPatientId(data.patient_id ?? null);
           setFullName(data.full_name ?? null);
+          registerForPushNotifications();
         } catch {
           await AsyncStorage.removeItem('token');
           setToken(null);
@@ -46,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const me = await getMe();
     setPatientId(me.data.patient_id ?? null);
     setFullName(me.data.full_name ?? null);
+    registerForPushNotifications();
   };
 
   const login = async (phone: string, password: string) => {
@@ -54,6 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Clear server-side before dropping the local token -- clearPushToken is an
+    // authenticated call, so a shared/reset device doesn't keep receiving the
+    // outgoing user's pushes after this. Best-effort: a network hiccup here
+    // shouldn't block signing out.
+    try {
+      await clearPushToken();
+    } catch {}
     await AsyncStorage.removeItem('token');
     setToken(null);
     setPatientId(null);
