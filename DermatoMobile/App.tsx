@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import BootSplash from 'react-native-bootsplash';
 import { Home as HomeIcon, ScanFace, History as HistoryIcon, TrendingUp } from 'lucide-react-native';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import LoginScreen from './src/screens/LoginScreen';
@@ -53,6 +54,13 @@ function MainTabs() {
 
 function RootNavigator() {
   const { loading, token } = useAuth();
+
+  // Keeps the native splash up through the initial auth check (AuthContext's
+  // AsyncStorage/getMe round-trip) instead of hiding it into a bare
+  // ActivityIndicator -- one continuous cold-start visual, no flash between them.
+  useEffect(() => {
+    if (!loading) BootSplash.hide({ fade: true });
+  }, [loading]);
 
   if (loading) {
     return (

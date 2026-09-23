@@ -39,10 +39,11 @@ jobs:
 
       # assembleRelease (not assembleDebug): the debug build variant expects
       # a Metro server running alongside it and won't run standalone on a
-      # tester's phone. Release bundles the JS into the APK. This project's
-      # release build type is still signed with the bundled debug keystore
-      # (see android/app/build.gradle) — no separate signing key needed for
-      # an ad-hoc test build.
+      # tester's phone. Release bundles the JS into the APK. The real release
+      # signing key (android/keystore.properties, gitignored) only exists on
+      # dev machines, not here, so build.gradle falls back to the bundled
+      # debug keystore for this ad-hoc CI build -- fine for handing testers an
+      # APK, but this is not what gets uploaded to the Play Store.
       - name: Build release APK
         working-directory: DermatoMobile/android
         run: |

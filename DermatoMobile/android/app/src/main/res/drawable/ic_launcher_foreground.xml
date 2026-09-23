@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Same cross mark as frontend/public/favicon.svg, scaled into Android's
+     108x108dp adaptive-icon canvas with the standard safe-zone padding so
+     it isn't clipped by circular/squircle/rounded-square launcher masks. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M49.5,36 L58.5,36 L58.5,49.5 L72,49.5 L72,58.5 L58.5,58.5 L58.5,72 L49.5,72 L49.5,58.5 L36,58.5 L36,49.5 L49.5,49.5 Z" />
+</vector>

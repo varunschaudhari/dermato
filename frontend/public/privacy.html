@@ -1,0 +1,105 @@
+<!--
+  DRAFT — written from the app's actual data-handling code (see
+  backend/app/schemas.py, api/routes/patients.py, auth.py, sessions.py) as of
+  Sept 2026. This is a starting point for you (or counsel, given it covers
+  health-adjacent data) to review and edit before it's treated as final. Not
+  legal advice.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy — Dermato</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      max-width: 720px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+      color: #1f2937;
+      line-height: 1.65;
+    }
+    h1 { color: #0d9488; font-size: 28px; margin-bottom: 4px; }
+    .updated { color: #6b7280; font-size: 14px; margin-bottom: 40px; }
+    h2 { font-size: 18px; margin-top: 40px; color: #111827; }
+    p, li { font-size: 15px; }
+    ul { padding-left: 20px; }
+    a { color: #0d9488; }
+    .contact { background: #f0fdfa; border: 1px solid #99f6e4; border-radius: 8px; padding: 16px 20px; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: [DATE — fill in before publishing]</p>
+
+  <p>
+    Dermato ("we", "our", "the app") provides AI-assisted skin analysis and
+    connects patients with dermatologists for review and follow-up. This
+    policy explains what information we collect, why, and how it's handled,
+    across both the Dermato mobile app and the Dermato web app.
+  </p>
+
+  <h2>Information we collect</h2>
+  <ul>
+    <li><strong>Account information:</strong> full name, phone number, email address, age, and skin type, when you register.</li>
+    <li><strong>Skin photos:</strong> images you capture or upload for analysis (front, and optionally left/right angles on the web app), along with the AI-generated severity assessment and recommendations for each photo.</li>
+    <li><strong>Health/treatment history:</strong> treatment plans, recheck schedules, your optional skin history (allergies, current products, known conditions, medications), and any notes you or your dermatologist add to a scan.</li>
+    <li><strong>Messages:</strong> messages exchanged between you and your assigned dermatologist within the app.</li>
+    <li><strong>Appointments:</strong> if you book a consultation, the date, time, and dermatologist you booked with.</li>
+    <li><strong>Device push token (mobile app only):</strong> a device identifier used solely to deliver notifications (e.g. recheck reminders, new messages) to your phone. You can decline notification permission at any time; the app works without it.</li>
+  </ul>
+
+  <p>We do not use third-party advertising or analytics SDKs in the app, and we do not sell your information.</p>
+
+  <h2>How we use this information</h2>
+  <ul>
+    <li>To run the AI skin analysis and show you your results and progress over time.</li>
+    <li>To share your scans, history, and messages with the dermatologist assigned to your care, so they can review your case and respond to you.</li>
+    <li>To send you recheck reminders and message notifications (by email and, on the mobile app, push notification).</li>
+    <li>To operate your account (login, password reset).</li>
+  </ul>
+
+  <h2>Who can see your information</h2>
+  <p>
+    Your skin photos, treatment history, and messages are visible to the
+    dermatologist assigned to your case, and to administrators of the Dermato
+    platform for the purpose of operating the service. We do not share your
+    information with outside companies or advertisers.
+  </p>
+
+  <h2>Camera and photo access</h2>
+  <p>
+    The app requests camera and/or photo library access only when you choose
+    to take or upload a photo for analysis. We only store the specific photo
+    you choose to submit — the app does not access your camera roll in the
+    background.
+  </p>
+
+  <h2>Data retention and deletion</h2>
+  <p>
+    We retain your account and scan history for as long as your account is
+    active, so you and your dermatologist can track progress over time. To
+    request deletion of your account and data, contact us using the details
+    below.
+  </p>
+
+  <h2>Security</h2>
+  <p>
+    Passwords are stored hashed, not in plain text. Data is transmitted over
+    encrypted (HTTPS) connections.
+  </p>
+
+  <h2>Children</h2>
+  <p>Dermato is not directed at children under 18. If you believe a child has created an account, contact us and we'll remove it.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>We'll update the date at the top of this page whenever this policy changes.</p>
+
+  <div class="contact">
+    <strong>Questions or data requests:</strong><br />
+    [CONTACT EMAIL — fill in before publishing]
+  </div>
+</body>
+</html>

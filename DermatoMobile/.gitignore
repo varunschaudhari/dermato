@@ -71,6 +71,12 @@ yarn-error.log
 android/app/google-services.json
 ios/GoogleService-Info.plist
 
+# Release signing key -- back this up somewhere outside git (password manager,
+# etc). Losing it is recoverable via Play Console's upload-key reset (Play App
+# Signing), but avoid the hassle.
+android/app/*.jks
+android/keystore.properties
+
 # Yarn
 .yarn/*
 !.yarn/patches
