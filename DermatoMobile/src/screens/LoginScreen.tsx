@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Phone, Lock, Eye, EyeOff } from 'lucide-react-native';
+import { User, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
@@ -40,16 +40,17 @@ export default function LoginScreen() {
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <Text style={styles.label}>Mobile number</Text>
+      <Text style={styles.label}>Mobile number or email</Text>
       <View style={styles.inputWrapper}>
-        <Phone size={16} color="#9ca3af" style={styles.inputIcon} />
+        <User size={16} color="#9ca3af" style={styles.inputIcon} />
         <TextInput
           style={styles.input}
           autoCapitalize="none"
-          keyboardType="phone-pad"
+          autoCorrect={false}
+          keyboardType="default"
           value={phone}
           onChangeText={setPhone}
-          placeholder="9876543210"
+          placeholder="9876543210 or you@example.com"
         />
       </View>
 

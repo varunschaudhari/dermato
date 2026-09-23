@@ -73,3 +73,17 @@ def mark_all_read(db=Depends(get_db), current_user=Depends(get_current_user)):
         {"user_id": current_user.id, "is_read": False}, {"$set": {"is_read": True}}
     )
     return {"status": "ok"}
+
+
+@router.post("/read-for-patient/{patient_id}")
+def mark_patient_messages_read(patient_id: int, db=Depends(get_db), current_user=Depends(get_current_user)):
+    """Called when opening a patient's message thread (MessageThread.jsx) --
+    clears just this patient's unread 'new_message' notifications for the
+    current user, so the inbox's unread badge (get_messages_inbox) reflects
+    threads actually read rather than staying stuck until the bell/notifications
+    page is used separately."""
+    db.notifications.update_many(
+        {"user_id": current_user.id, "type": "new_message", "link": f"/progress/{patient_id}", "is_read": False},
+        {"$set": {"is_read": True}},
+    )
+    return {"status": "ok"}

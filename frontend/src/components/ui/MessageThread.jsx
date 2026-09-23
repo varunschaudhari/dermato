@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { MessageCircle, Send } from 'lucide-react'
-import { getMessages, sendMessage } from '../../services/api'
+import { getMessages, sendMessage, markPatientMessagesRead } from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import Card from './Card'
@@ -20,6 +20,14 @@ export default function MessageThread({ patientId }) {
     queryFn: () => getMessages(patientId).then((r) => r.data),
     refetchInterval: 30000,
   })
+
+  // Opening a thread clears its unread badge in the inbox (get_messages_inbox) --
+  // without this, a doctor could read and reply to every message here and the
+  // inbox would still show it as unread until they separately visited
+  // Notifications. Harmless no-op for a patient with nothing unread here.
+  useEffect(() => {
+    markPatientMessagesRead(patientId).catch(() => {})
+  }, [patientId])
 
   const mutation = useMutation({
     mutationFn: (text) => sendMessage(patientId, text),

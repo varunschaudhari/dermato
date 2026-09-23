@@ -327,6 +327,20 @@ def send_message(
 
     if notify_user_id:
         notify_user(db, notify_user_id, "new_message", notify_message, f"/progress/{patient_id}", related_id=doc["_id"])
+    elif current_user.role == "patient":
+        # Self-registered patients start unclaimed (assigned_doctor_id is None)
+        # -- without this, a message from one of them saved successfully but
+        # nobody was ever told, since there was no doctor to notify. Fall back
+        # to every admin, so someone can either reply or assign a doctor.
+        for admin in db.users.find({"role": "admin", "is_active": True}):
+            notify_user(
+                db,
+                admin["_id"],
+                "new_message",
+                f"New message from unclaimed patient {patient['name']} (no assigned doctor yet)",
+                f"/progress/{patient_id}",
+                related_id=doc["_id"],
+            )
 
     return to_ns(doc)
 

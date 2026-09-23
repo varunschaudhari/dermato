@@ -42,8 +42,8 @@ export default function ConsentGate() {
           </p>
           <p>
             Photos you upload are stored securely and shared only with your assigned dermatologist and
-            clinic staff. You can request a full export or deletion of your data at any time from your
-            profile.
+            clinic staff. You can export your data at any time from your progress page, or contact us
+            to request that your account and data be deleted.
           </p>
         </div>
         <Button onClick={handleAccept} disabled={loading} fullWidth>

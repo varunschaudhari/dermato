@@ -36,14 +36,17 @@ def send_due_recheck_reminders(db) -> int:
             db.treatment_plans.update_one({"_id": plan["_id"]}, {"$set": {"reminder_sent_at": now}})
             continue
 
-        link = f"{settings.FRONTEND_URL}/analyze"
+        # Analyze is mounted at "/", not "/analyze" -- there is no /analyze route
+        # in the frontend router, so this used to link both the in-app
+        # notification and the reminder email to a dead page.
+        link = settings.FRONTEND_URL
         notify_user(
             db,
             patient_user["_id"],
             "recheck_due",
             f"Time for your {plan['condition']} recheck — it's been "
             f"{plan.get('duration_weeks') or 'a while'} weeks since your last scan.",
-            "/analyze",
+            "/",
             related_id=plan["_id"],
         )
         send_recheck_reminder_email(patient_user["email"], patient["name"], plan["condition"], link)

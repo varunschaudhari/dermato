@@ -95,6 +95,7 @@ export const importPatientsCsv = (formData) =>
 export const getNotifications = (limit) => api.get('/notifications/', { params: limit ? { limit } : {} })
 export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`)
 export const markAllNotificationsRead = () => api.post('/notifications/read-all')
+export const markPatientMessagesRead = (patientId) => api.post(`/notifications/read-for-patient/${patientId}`)
 
 export const getMessages = (patientId) => api.get(`/patients/${patientId}/messages`)
 export const sendMessage = (patientId, body) => api.post(`/patients/${patientId}/messages`, { body })
