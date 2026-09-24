@@ -673,6 +673,19 @@ export default function ProgressPage() {
               <>
                 <ScoreTrend sessions={sessions} />
 
+                {(canEditNotes || sessions[sessions.length - 1].doctor_note) && (
+                  <Card>
+                    <h2 className="text-lg font-semibold mb-1 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <MessageSquarePlus className="w-5 h-5 text-brand-600" />
+                      Latest Visit Note
+                    </h2>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
+                      {new Date(sessions[sessions.length - 1].captured_at).toLocaleDateString()}
+                    </p>
+                    <DoctorNote session={sessions[sessions.length - 1]} canEdit={canEditNotes} patientId={patientId} />
+                  </Card>
+                )}
+
                 <PhotoTimeline sessions={sessions} />
 
                 {sessions.length >= 2 && (

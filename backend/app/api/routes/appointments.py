@@ -30,6 +30,30 @@ def list_available_doctors(db=Depends(get_db), current_user=Depends(get_current_
     return [{"id": d["_id"], "full_name": d["full_name"]} for d in docs]
 
 
+@router.get("/doctors/{doctor_id}/busy-times")
+def get_doctor_busy_times(
+    doctor_id: int, date: str, db=Depends(get_db), current_user=Depends(get_current_user)
+):
+    """This doctor's already-booked start times on `date` (YYYY-MM-DD) -- just
+    times, no patient names or other identifying details, so any patient can
+    check before picking a slot. Same auth level as /doctors and the GET /
+    list below: any authenticated user, not staff-only, since patients are
+    the ones who need this to book."""
+    try:
+        day_start = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+
+    docs = db.appointments.find(
+        {
+            "doctor_id": doctor_id,
+            "status": "scheduled",
+            "scheduled_at": {"$gte": day_start, "$lt": day_start + timedelta(days=1)},
+        }
+    ).sort("scheduled_at", 1)
+    return [d["scheduled_at"] for d in docs]
+
+
 @router.get("/", response_model=list[AppointmentOut])
 def list_appointments(db=Depends(get_db), current_user=Depends(get_current_user)):
     if current_user.role == "patient":

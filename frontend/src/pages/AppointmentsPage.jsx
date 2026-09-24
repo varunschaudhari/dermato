@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, CalendarX, CalendarCheck, Clock, CalendarClock } from 'lucide-react'
-import { getAppointments, getAvailableDoctors, createAppointment, updateAppointmentStatus, getPatients } from '../services/api'
+import { getAppointments, getAvailableDoctors, getDoctorBusyTimes, createAppointment, updateAppointmentStatus, getPatients } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import PageHeader from '../components/ui/PageHeader'
@@ -35,6 +35,12 @@ function BookingForm({ isPatient, patientId }) {
     queryKey: ['patients'],
     queryFn: () => getPatients().then((r) => r.data),
     enabled: !isPatient,
+  })
+
+  const { data: busyTimes = [] } = useQuery({
+    queryKey: ['doctor-busy-times', form.doctor_id, form.date],
+    queryFn: () => getDoctorBusyTimes(form.doctor_id, form.date).then((r) => r.data),
+    enabled: !!form.doctor_id && !!form.date,
   })
 
   const mutation = useMutation({
@@ -113,6 +119,15 @@ function BookingForm({ isPatient, patientId }) {
             required
           />
         </div>
+
+        {form.doctor_id && form.date && busyTimes.length > 0 && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2">
+            Already booked that day:{' '}
+            {busyTimes
+              .map((t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+              .join(', ')}
+          </p>
+        )}
 
         <FormField
           label="Reason (optional)"

@@ -262,6 +262,9 @@ export interface DoctorOption {
 
 export const getAvailableDoctors = () => api.get<DoctorOption[]>('/appointments/doctors');
 
+export const getDoctorBusyTimes = (doctorId: number, date: string) =>
+  api.get<string[]>(`/appointments/doctors/${doctorId}/busy-times`, { params: { date } });
+
 export interface AppointmentOut {
   id: number;
   patient_id: number;

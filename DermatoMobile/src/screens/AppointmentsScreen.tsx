@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, ScrollView, TextInput, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { CalendarPlus, Clock } from 'lucide-react-native';
@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   getAppointments,
   getAvailableDoctors,
+  getDoctorBusyTimes,
   createAppointment,
   updateAppointmentStatus,
   getErrorMessage,
@@ -28,6 +29,17 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [busyTimes, setBusyTimes] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!doctorId || !date) {
+      setBusyTimes([]);
+      return;
+    }
+    getDoctorBusyTimes(doctorId, date)
+      .then(({ data }) => setBusyTimes(data))
+      .catch(() => setBusyTimes([])); // malformed/in-progress date input -- just show nothing rather than an error
+  }, [doctorId, date]);
 
   const handleSubmit = async () => {
     if (!patientId || !doctorId || !date || !time) return;
@@ -83,6 +95,15 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
           <TextInput style={styles.input} value={time} onChangeText={setTime} placeholder="HH:MM (24h)" placeholderTextColor={COLORS.mutedGray} />
         </View>
       </View>
+
+      {busyTimes.length > 0 && (
+        <Text style={styles.busyTimesText}>
+          Already booked that day:{' '}
+          {busyTimes
+            .map((t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+            .join(', ')}
+        </Text>
+      )}
 
       <Text style={styles.fieldLabel}>Reason (optional)</Text>
       <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Follow-up on acne treatment" placeholderTextColor={COLORS.mutedGray} />
@@ -195,6 +216,7 @@ const styles = StyleSheet.create({
   cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
   fieldLabel: { fontSize: 12, color: COLORS.secondaryText, marginBottom: 4, marginTop: 10 },
+  busyTimesText: { fontSize: 12, color: '#d97706', marginTop: 8 },
   input: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: COLORS.heading, backgroundColor: '#fff' },
   row: { flexDirection: 'row', gap: 10 },
   doctorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

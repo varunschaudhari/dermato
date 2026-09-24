@@ -103,6 +103,8 @@ export const getMessagesInbox = () => api.get('/patients/messages/inbox')
 
 export const getAppointments = () => api.get('/appointments/')
 export const getAvailableDoctors = () => api.get('/appointments/doctors')
+export const getDoctorBusyTimes = (doctorId, date) =>
+  api.get(`/appointments/doctors/${doctorId}/busy-times`, { params: { date } })
 export const createAppointment = (data) => api.post('/appointments/', data)
 export const updateAppointmentStatus = (id, status) => api.patch(`/appointments/${id}/status`, { status })
 

@@ -106,3 +106,44 @@ def test_appointment_rejects_invalid_status(client, auth_headers):
 def test_appointments_require_auth(client):
     res = client.get("/api/appointments/")
     assert res.status_code == 401
+
+
+def test_busy_times_reflects_booked_appointment(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    patient_id = _create_patient(client, auth_headers)
+    client.post(
+        "/api/appointments/",
+        json={"patient_id": patient_id, "doctor_id": doctor_id, "scheduled_at": "2027-06-10T13:30:00"},
+        headers=auth_headers,
+    )
+
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/busy-times",
+        params={"date": "2027-06-10"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    times = res.json()
+    assert len(times) == 1
+    assert times[0].startswith("2027-06-10T13:30:00")
+
+
+def test_busy_times_empty_for_a_day_with_no_appointments(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/busy-times",
+        params={"date": "2027-06-11"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json() == []
+
+
+def test_busy_times_rejects_malformed_date(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/busy-times",
+        params={"date": "not-a-date"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400

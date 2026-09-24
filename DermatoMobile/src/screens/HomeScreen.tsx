@@ -319,6 +319,18 @@ export default function HomeScreen() {
               ))
             )}
           </View>
+
+          {/* Redundant, always-reachable path to Profile alongside the small
+              header icon -- a second body-level entry point, same idea as
+              "Book Appointment" above, not solely relying on a tiny target. */}
+          <TouchableOpacity
+            style={styles.manageProfileRow}
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Manage Profile"
+          >
+            <Text style={styles.manageProfileText}>Manage Profile</Text>
+          </TouchableOpacity>
         </>
       )}
     </ScrollView>
@@ -331,7 +343,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  bellButton: { padding: 2 },
+  // Was padding: 2 -- a ~24x24pt hit area around a 20px icon, well under the
+  // ~44pt touch-target guideline. Shared by both the Bell and Profile icons.
+  bellButton: { padding: 10 },
   bellDot: { position: 'absolute', top: 0, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   alertBanner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, borderRadius: 12, padding: 13, marginBottom: 16 },
@@ -363,6 +377,8 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
   seeAllLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
   emptyText: { fontSize: 13, color: COLORS.mutedGray },
+  manageProfileRow: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 20 },
+  manageProfileText: { color: COLORS.secondaryText, fontWeight: '600', fontSize: 14 },
   treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },
   treatmentCondition: { fontSize: 13, color: '#374151', fontWeight: '600' },
   treatmentRecheck: { fontSize: 11, color: COLORS.mutedGray, marginTop: 2 },
