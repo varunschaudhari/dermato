@@ -218,7 +218,7 @@ export default function ResultsScreen() {
   const { result } = route.params;
   const {
     severity, recommendations, model_powered: modelPowered, ml_detections: mlDetections,
-    previous_severity: previousSeverity = {}, flags = {}, wsi = {}, overlays = {}, image_url: imageUrl, patient_id: patientId,
+    previous_severity: previousSeverity = {}, flags = {}, overlays = {}, image_url: imageUrl, patient_id: patientId,
   } = result;
   const detections = mlDetections?.detections ?? [];
 
@@ -505,7 +505,6 @@ export default function ResultsScreen() {
                   : 'same'
               ]
             : null;
-          const wsiVal = (wsi as any)[condition];
           const flag = (flags as any)[condition];
           return (
             <View key={condition} style={styles.severityCard}>
@@ -513,7 +512,6 @@ export default function ResultsScreen() {
               <View style={[styles.severityPill, { backgroundColor: meta.bg }]}>
                 <Text style={[styles.severityPillText, { color: meta.color }]}>{meta.label}</Text>
               </View>
-              {wsiVal != null && <Text style={styles.wsi}>WSI {wsiVal.toFixed(2)}</Text>}
               {delta && (
                 <View style={styles.deltaRow}>
                   <delta.icon size={12} color={delta.color} />
@@ -611,6 +609,7 @@ export default function ResultsScreen() {
             {rec.examples?.map((ex: string) => (
               <Text key={ex} style={styles.recExample}>• {ex}</Text>
             ))}
+            {rec.how_to ? <Text style={styles.howTo}>{rec.how_to}</Text> : null}
             {rec.duration_weeks ? <Text style={styles.duration}>Duration: {rec.duration_weeks} weeks</Text> : null}
           </View>
         );
@@ -706,7 +705,6 @@ const styles = StyleSheet.create({
   cardLabel: { fontSize: 12, color: COLORS.secondaryText, marginBottom: 6 },
   severityPill: { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 4 },
   severityPillText: { fontSize: 12, fontWeight: '700' },
-  wsi: { fontSize: 11, color: COLORS.mutedGray },
   deltaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   deltaText: { fontSize: 11, fontWeight: '600', textTransform: 'capitalize' },
   flag: { fontSize: 11, color: '#d97706', marginTop: 4 },
@@ -730,6 +728,7 @@ const styles = StyleSheet.create({
   escalatedBadgeText: { fontSize: 11, color: '#d97706', fontWeight: '600' },
   escalated: { fontSize: 11, color: '#d97706', marginBottom: 4 },
   recExample: { fontSize: 13, color: '#4b5563', marginTop: 2 },
+  howTo: { fontSize: 12, color: COLORS.mutedGray, marginTop: 6, lineHeight: 17 },
   duration: { fontSize: 11, color: COLORS.mutedGray, marginTop: 6 },
   disclaimer: { fontSize: 11, color: COLORS.mutedGray, fontStyle: 'italic', marginTop: 12, marginBottom: 20 },
   ctaRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },

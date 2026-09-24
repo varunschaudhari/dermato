@@ -493,7 +493,7 @@ export default function ResultsPage() {
             <Card key={condition} className="text-center p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400 capitalize mb-2">{condition}</p>
               <Badge color={s.color} icon={s.icon}>{level}</Badge>
-              {wsi[condition] != null && (
+              {!isPatient && wsi[condition] != null && (
                 <p className="text-[11px] font-mono tabular-nums text-gray-400 dark:text-gray-500 mt-1">WSI {wsi[condition].toFixed(2)}</p>
               )}
               {delta && (
@@ -592,6 +592,9 @@ export default function ResultsPage() {
               <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
                 {rec.examples.map((e) => <li key={e}>{e}</li>)}
               </ul>
+              {rec.how_to && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed">{rec.how_to}</p>
+              )}
               {rec.duration_weeks && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">Duration: {rec.duration_weeks} weeks</p>
               )}

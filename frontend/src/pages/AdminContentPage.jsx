@@ -19,6 +19,7 @@ function RemedyRow({ condition, severity, remedy, onSave, saving }) {
   const [type, setType] = useState(remedy?.type || TYPE_OPTIONS[0])
   const [examplesText, setExamplesText] = useState((remedy?.examples || []).join('\n'))
   const [durationWeeks, setDurationWeeks] = useState(remedy?.duration_weeks || '')
+  const [howTo, setHowTo] = useState(remedy?.how_to || '')
 
   const handleSave = () => {
     onSave(condition, severity, {
@@ -28,6 +29,7 @@ function RemedyRow({ condition, severity, remedy, onSave, saving }) {
         .map((line) => line.trim())
         .filter(Boolean),
       duration_weeks: durationWeeks.trim() === '' ? null : durationWeeks.trim(),
+      how_to: howTo.trim() === '' ? null : howTo.trim(),
     })
   }
 
@@ -71,6 +73,16 @@ function RemedyRow({ condition, severity, remedy, onSave, saving }) {
             className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
           />
         </div>
+      </div>
+      <div className="mt-3">
+        <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">How to use (shown to patients under the examples)</label>
+        <textarea
+          rows={2}
+          value={howTo}
+          onChange={(e) => setHowTo(e.target.value)}
+          placeholder="e.g. Apply once daily, following the product label. Introduce one new product at a time."
+          className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+        />
       </div>
       <div className="mt-3">
         <Button onClick={handleSave} size="sm" icon={Save} disabled={saving}>

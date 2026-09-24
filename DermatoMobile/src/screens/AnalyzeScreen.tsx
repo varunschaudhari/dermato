@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
-import { Lightbulb } from 'lucide-react-native';
+import { Lightbulb, Check, Plus } from 'lucide-react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -9,6 +9,14 @@ import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client'
 import { COLORS } from '../constants';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
+type Angle = 'front' | 'left' | 'right';
+type Photos = Record<Angle, Asset | null>;
+
+const ANGLES: { key: Angle; label: string; required: boolean }[] = [
+  { key: 'front', label: 'Front', required: true },
+  { key: 'left', label: 'Left angle', required: false },
+  { key: 'right', label: 'Right angle', required: false },
+];
 
 // General good-practice guidance, not a precise measured protocol -- there's
 // no documented/enforced capture distance anywhere in this app (checked the
@@ -26,13 +34,19 @@ const CAPTURE_TIPS = [
 type RootStackParamList = { MainTabs: undefined; Results: { result: any } };
 
 export default function AnalyzeScreen() {
-  const [photo, setPhoto] = useState<Asset | null>(null);
+  const [photos, setPhotos] = useState<Photos>({ front: null, left: null, right: null });
+  const [activeAngle, setActiveAngle] = useState<Angle>('front');
+  // Quality precheck only ever applies to the front photo -- it's the one
+  // required, primary diagnostic shot the submit gate cares about; left/right
+  // are optional supplementary context, same as the web app's treatment of them.
   const [qualityStatus, setQualityStatus] = useState<QualityStatus>('idle');
   const [qualityMessage, setQualityMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { patientId, logout, fullName } = useAuth();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+
+  const photo = photos[activeAngle];
 
   // Checks the photo the moment it's picked, not just when Analyze is finally
   // tapped — see checkPhotoQuality's comment in api/client.ts for why this is
@@ -57,7 +71,7 @@ export default function AnalyzeScreen() {
     }
   };
 
-  const pickFrom = async (source: 'camera' | 'gallery') => {
+  const pickFrom = async (source: 'camera' | 'gallery', angle: Angle) => {
     const result = source === 'camera' ? await launchCamera({ mediaType: 'photo', quality: 0.8 }) : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
     // Both didCancel and errorCode leave `assets` empty -- without checking
     // these first, a denied permission or a camera-less device (e.g. some
@@ -75,8 +89,8 @@ export default function AnalyzeScreen() {
     }
     const asset = result.assets?.[0];
     if (asset) {
-      setPhoto(asset);
-      runQualityCheck(asset);
+      setPhotos((prev) => ({ ...prev, [angle]: asset }));
+      if (angle === 'front') runQualityCheck(asset);
     }
   };
 
@@ -84,15 +98,17 @@ export default function AnalyzeScreen() {
     // 'idle' here means the precheck itself was inconclusive (e.g. network
     // hiccup), not that the photo failed — only a confirmed 'failed' or a
     // check still in flight should block submission.
-    if (!photo || !patientId || qualityStatus === 'checking' || qualityStatus === 'failed') return;
+    if (!photos.front || !patientId || qualityStatus === 'checking' || qualityStatus === 'failed') return;
     setLoading(true);
     setError('');
     try {
-      const { data } = await analyzeImage(patientId, {
-        uri: photo.uri!,
-        type: photo.type || 'image/jpeg',
-        name: photo.fileName || 'photo.jpg',
-      });
+      const toPhotoPayload = (a: Asset) => ({ uri: a.uri!, type: a.type || 'image/jpeg', name: a.fileName || 'photo.jpg' });
+      const { data } = await analyzeImage(
+        patientId,
+        toPhotoPayload(photos.front),
+        photos.left ? toPhotoPayload(photos.left) : undefined,
+        photos.right ? toPhotoPayload(photos.right) : undefined
+      );
       navigation.navigate('Results', { result: data });
     } catch (err: any) {
       setError(getErrorMessage(err, 'Analysis failed. Check your connection and try again.'));
@@ -120,13 +136,46 @@ export default function AnalyzeScreen() {
         </View>
       </View>
 
+      <View style={styles.angleRow}>
+        {ANGLES.map(({ key, label, required }) => {
+          const captured = !!photos[key];
+          const active = activeAngle === key;
+          if (!required && !captured && !active) {
+            return (
+              <TouchableOpacity
+                key={key}
+                style={styles.angleChipAdd}
+                onPress={() => setActiveAngle(key)}
+                accessibilityRole="button"
+                accessibilityLabel={`Add ${label.toLowerCase()}`}
+              >
+                <Plus size={12} color={COLORS.teal} />
+                <Text style={styles.angleChipAddText}>{label}</Text>
+              </TouchableOpacity>
+            );
+          }
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.angleChip, active && styles.angleChipActive]}
+              onPress={() => setActiveAngle(key)}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+            >
+              {captured && <Check size={12} color={active ? '#fff' : COLORS.teal} />}
+              <Text style={[styles.angleChipText, active && styles.angleChipTextActive]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       <View style={styles.photoBox}>
         {photo ? (
-          <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel="Selected photo preview" />
+          <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel={`Selected ${activeAngle} photo preview`} />
         ) : (
           <Text style={styles.photoPlaceholder}>No photo selected</Text>
         )}
-        {qualityStatus === 'checking' && (
+        {activeAngle === 'front' && qualityStatus === 'checking' && (
           <View style={styles.qualityOverlay}>
             <ActivityIndicator color="#fff" size="small" />
             <Text style={styles.qualityOverlayText}>Checking photo quality…</Text>
@@ -134,12 +183,12 @@ export default function AnalyzeScreen() {
         )}
       </View>
 
-      {qualityStatus === 'ok' && (
+      {activeAngle === 'front' && qualityStatus === 'ok' && (
         <View style={styles.qualityOk}>
           <Text style={styles.qualityOkText}>✓ Looks good</Text>
         </View>
       )}
-      {qualityStatus === 'failed' && (
+      {activeAngle === 'front' && qualityStatus === 'failed' && (
         <View style={styles.qualityFailed}>
           <Text style={styles.qualityFailedText}>{qualityMessage}</Text>
         </View>
@@ -148,7 +197,7 @@ export default function AnalyzeScreen() {
       <View style={styles.row}>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => pickFrom('camera')}
+          onPress={() => pickFrom('camera', activeAngle)}
           accessibilityRole="button"
           accessibilityLabel="Take Photo"
         >
@@ -156,7 +205,7 @@ export default function AnalyzeScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => pickFrom('gallery')}
+          onPress={() => pickFrom('gallery', activeAngle)}
           accessibilityRole="button"
           accessibilityLabel="Choose from Gallery"
         >
@@ -169,11 +218,11 @@ export default function AnalyzeScreen() {
       <TouchableOpacity
         style={[
           styles.button,
-          (!photo || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
+          (!photos.front || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
             styles.buttonDisabled,
         ]}
         onPress={handleAnalyze}
-        disabled={!photo || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+        disabled={!photos.front || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
         accessibilityRole="button"
         accessibilityLabel="Analyze Image"
       >
@@ -193,6 +242,13 @@ const styles = StyleSheet.create({
   tipsIcon: { marginTop: 2 },
   tipsTextWrap: { flex: 1, gap: 3 },
   tipsText: { fontSize: 12, color: '#4b5563', lineHeight: 17 },
+  angleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  angleChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  angleChipActive: { backgroundColor: COLORS.teal },
+  angleChipText: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
+  angleChipTextActive: { color: '#fff' },
+  angleChipAdd: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.divider, borderStyle: 'dashed', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  angleChipAddText: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
   photoBox: { height: 260, borderRadius: 16, borderWidth: 2, borderColor: '#d1d5db', borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff', marginBottom: 12, overflow: 'hidden', position: 'relative' },
   photoPreview: { width: '100%', height: '100%', resizeMode: 'cover' },
   photoPlaceholder: { color: COLORS.mutedGray, fontSize: 13 },

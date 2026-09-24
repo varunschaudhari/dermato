@@ -48,7 +48,7 @@ export interface AnalyzeResult {
   wsi: Record<string, number | null>;
   flags: Record<string, string | null>;
   previous_severity?: Record<string, Severity>;
-  recommendations: Record<string, { type: string; examples: string[]; duration_weeks?: number; escalated?: boolean } | string>;
+  recommendations: Record<string, { type: string; examples: string[]; duration_weeks?: number; how_to?: string | null; escalated?: boolean } | string>;
   overlays?: Overlays;
   ml_detections?: {
     detections: MlDetection[];
@@ -81,7 +81,27 @@ export const login = (phone: string, password: string) => {
   });
 };
 
-export const getMe = () => api.get('/auth/me');
+export interface UserOut {
+  id: number;
+  phone?: string | null;
+  email: string;
+  full_name?: string | null;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  patient_id?: number | null;
+  consent_given_at?: string | null;
+}
+
+export const getMe = () => api.get<UserOut>('/auth/me');
+
+export const updateMe = (data: { full_name?: string; phone?: string; email?: string }) =>
+  api.patch<UserOut>('/auth/me', data);
+
+export const changePassword = (data: { current_password: string; new_password: string }) =>
+  api.post('/auth/me/password', data);
+
+export const forgotPassword = (email: string) => api.post('/auth/forgot-password', { email });
 
 export const registerPushToken = (token: string) => api.post('/auth/me/push-token', { token });
 
@@ -98,13 +118,23 @@ export interface RegisterPatientPayload {
 
 export const registerPatient = (payload: RegisterPatientPayload) => api.post('/auth/register-patient', payload);
 
+type PhotoAsset = { uri: string; type: string; name: string };
+
 // The backend always analyzes all four conditions server-side; condition
 // selection in this app is a display filter only (applied in ResultsScreen),
 // mirroring how the web app's AnalyzePage/ResultsPage split that work.
-export const analyzeImage = (patientId: number, photo: { uri: string; type: string; name: string }) => {
+// left/right are optional, same as web's AnalyzePage -- only front is required.
+export const analyzeImage = (
+  patientId: number,
+  photo: PhotoAsset,
+  left?: PhotoAsset | null,
+  right?: PhotoAsset | null
+) => {
   const formData = new FormData();
   // React Native's FormData accepts {uri, type, name} for files, unlike the DOM's File type
   formData.append('file', { uri: photo.uri, type: photo.type, name: photo.name } as any);
+  if (left) formData.append('file_left', { uri: left.uri, type: left.type, name: left.name } as any);
+  if (right) formData.append('file_right', { uri: right.uri, type: right.type, name: right.name } as any);
   formData.append('patient_id', String(patientId));
   return api.post<AnalyzeResult>('/analysis/analyze', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
@@ -224,3 +254,31 @@ export const getNotifications = () => api.get<NotificationOut[]>('/notifications
 export const markNotificationRead = (id: number) => api.patch<NotificationOut>(`/notifications/${id}/read`);
 
 export const markAllNotificationsRead = () => api.post('/notifications/read-all');
+
+export interface DoctorOption {
+  id: number;
+  full_name: string | null;
+}
+
+export const getAvailableDoctors = () => api.get<DoctorOption[]>('/appointments/doctors');
+
+export interface AppointmentOut {
+  id: number;
+  patient_id: number;
+  patient_name: string;
+  doctor_id: number;
+  doctor_name: string;
+  scheduled_at: string;
+  duration_minutes: number;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  reason?: string | null;
+  created_at: string;
+}
+
+export const getAppointments = () => api.get<AppointmentOut[]>('/appointments/');
+
+export const createAppointment = (data: { patient_id: number; doctor_id: number; scheduled_at: string; reason?: string | null }) =>
+  api.post<AppointmentOut>('/appointments/', data);
+
+export const updateAppointmentStatus = (id: number, status: 'completed' | 'cancelled') =>
+  api.patch<AppointmentOut>(`/appointments/${id}/status`, { status });

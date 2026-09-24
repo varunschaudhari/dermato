@@ -21,6 +21,7 @@ def update_remedy(condition: str, severity: str, body: dict, db=Depends(get_db))
         "type": body.get("type"),
         "examples": body.get("examples"),
         "duration_weeks": body.get("duration_weeks"),
+        "how_to": body.get("how_to"),
     }
     db.remedies.update_one({"_id": condition}, {"$set": {severity: entry}}, upsert=True)
     return db.remedies.find_one({"_id": condition})

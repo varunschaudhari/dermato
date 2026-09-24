@@ -3,15 +3,17 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } 
 import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Bell } from 'lucide-react-native';
+import { Bell, User as UserIcon } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
   getTreatmentPlans,
   getNotifications,
+  getAppointments,
   SessionOut,
   TreatmentPlanOut,
   NotificationOut,
+  AppointmentOut,
 } from '../api/client';
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { computeTreatmentProgress } from '../utils/treatmentProgress';
@@ -19,9 +21,9 @@ import { CONDITION_LABELS, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 
 type TabParamList = { Home: undefined; Analyze: undefined; History: undefined; Progress: undefined };
-// Notifications lives in the root Stack (a sibling of MainTabs), same as
-// Results/Messages — navigate() bubbles up to find it from here.
-type RootStackParamList = { Notifications: undefined };
+// Notifications/Profile/Appointments live in the root Stack (siblings of
+// MainTabs), same as Results/Messages — navigate() bubbles up to find them.
+type RootStackParamList = { Notifications: undefined; Profile: undefined; Appointments: undefined };
 type HomeNavigationProp = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList>,
   NativeStackNavigationProp<RootStackParamList>
@@ -30,10 +32,13 @@ type HomeNavigationProp = CompositeNavigationProp<
 type PriorityAlert = { key: string; kind: 'warning' | 'info'; message: string; actionLabel: string };
 
 // Mirrors the web app's getPriorityAlert (PatientHomePage.jsx): surfaces the
-// single most relevant thing right now, in priority order. Mobile has no
-// appointments feature (web-only), so the tiers here are overdue recheck >
-// unread notifications — one tier short of web's, not a different design.
-function getPriorityAlert(plans: TreatmentPlanOut[], notifications: NotificationOut[]): PriorityAlert | null {
+// single most relevant thing right now, in the same priority order --
+// overdue recheck > imminent appointment > unread notifications.
+function getPriorityAlert(
+  plans: TreatmentPlanOut[],
+  notifications: NotificationOut[],
+  upcomingAppointment?: AppointmentOut | null
+): PriorityAlert | null {
   const overduePlan = plans.find(
     (p) => p.status === 'active' && p.expected_recheck_at && new Date(p.expected_recheck_at) < new Date()
   );
@@ -45,6 +50,19 @@ function getPriorityAlert(plans: TreatmentPlanOut[], notifications: Notification
       message: `Your ${label} recheck is overdue — run a new analysis to see how it's progressing.`,
       actionLabel: 'Analyze now',
     };
+  }
+  if (upcomingAppointment) {
+    const hoursAway = (new Date(upcomingAppointment.scheduled_at).getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursAway <= 48) {
+      return {
+        key: 'appointment',
+        kind: 'info',
+        message: `Appointment with Dr. ${upcomingAppointment.doctor_name} on ${new Date(upcomingAppointment.scheduled_at).toLocaleString(undefined, {
+          weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        })}.`,
+        actionLabel: 'View details',
+      };
+    }
   }
   const unreadCount = notifications.filter((n) => !n.is_read).length;
   if (unreadCount > 0) {
@@ -71,6 +89,7 @@ export default function HomeScreen() {
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [notifications, setNotifications] = useState<NotificationOut[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -78,14 +97,16 @@ export default function HomeScreen() {
     if (!patientId) return;
     setLoading(true);
     try {
-      const [s, p, n] = await Promise.all([
+      const [s, p, n, a] = await Promise.all([
         getPatientSessions(patientId),
         getTreatmentPlans(patientId),
         getNotifications(),
+        getAppointments(),
       ]);
       setSessions(s.data);
       setPlans(p.data);
       setNotifications(n.data);
+      setAppointments(a.data);
       setError('');
     } catch {
       setError("Couldn't load your dashboard.");
@@ -107,11 +128,15 @@ export default function HomeScreen() {
   const meta = scoreMeta(score);
   const activePlans = plans.filter((p) => p.status === 'active');
   const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const priorityAlert = getPriorityAlert(plans, notifications);
+  const upcomingAppointment = appointments
+    .filter((a) => a.status === 'scheduled' && new Date(a.scheduled_at) > new Date())
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0];
+  const priorityAlert = getPriorityAlert(plans, notifications, upcomingAppointment);
 
   const handleAlertPress = () => {
     if (!priorityAlert) return;
     if (priorityAlert.key === 'overdue') navigation.navigate('Analyze');
+    else if (priorityAlert.key === 'appointment') navigation.navigate('Appointments');
     else navigation.navigate('Notifications');
   };
 
@@ -127,6 +152,14 @@ export default function HomeScreen() {
           <Text style={styles.subtitle}>Here's where your skin journey stands today</Text>
         </View>
         <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Profile"
+          >
+            <UserIcon size={20} color="#374151" strokeWidth={2} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.bellButton}
             onPress={() => navigation.navigate('Notifications')}
@@ -210,6 +243,14 @@ export default function HomeScreen() {
               accessibilityLabel="View Progress"
             >
               <Text style={styles.secondaryActionText}>View Progress</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryAction}
+              onPress={() => navigation.navigate('Appointments')}
+              accessibilityRole="button"
+              accessibilityLabel="Book Appointment"
+            >
+              <Text style={styles.secondaryActionText}>Book Appointment</Text>
             </TouchableOpacity>
           </View>
 

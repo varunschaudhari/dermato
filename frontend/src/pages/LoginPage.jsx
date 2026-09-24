@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Phone, Lock } from 'lucide-react'
+import { User, Lock } from 'lucide-react'
 import { login as loginApi, getMe } from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { homePathFor } from '../utils/roleHome'
@@ -42,9 +42,10 @@ export default function LoginPage() {
             {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
             <FormField
               id="login-phone"
-              label="Mobile number"
-              icon={Phone}
-              type="tel"
+              label="Mobile number or email"
+              icon={User}
+              type="text"
+              placeholder="9876543210 or you@example.com"
               required
               value={phone}
               onChange={(e) => setPhone(e.target.value)}

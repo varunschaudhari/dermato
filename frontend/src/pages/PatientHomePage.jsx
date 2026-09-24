@@ -1,9 +1,10 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import {
   ScanFace, TrendingUp, CalendarClock, ArrowUpRight, ArrowDownRight,
-  ClipboardList, Bell, ChevronRight, Sparkles,
+  ClipboardList, Bell, ChevronRight, Sparkles, MessageCircle, X,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { getPatient, getPatientSessions, getTreatmentPlans, getAppointments, getNotifications } from '../services/api'
@@ -88,9 +89,53 @@ function HeroSparkline({ sessions }) {
   )
 }
 
+const ORIENTATION_ITEMS = [
+  { icon: ScanFace, label: 'Analyze', description: 'Take or upload a photo to get an AI-assisted skin assessment.' },
+  { icon: TrendingUp, label: 'Progress', description: 'Track severity over time and see your treatment plans.' },
+  { icon: MessageCircle, label: 'Messages', description: 'Message your dermatologist directly once one is assigned to you.' },
+]
+
+// One-time orientation, shown only to a brand-new patient (zero sessions)
+// who hasn't dismissed it yet — the audit found nothing on this page explains
+// the app's nav/features beyond a single skippable card elsewhere.
+function WelcomeCard({ onDismiss }) {
+  return (
+    <Card className="relative">
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss welcome message"
+        className="absolute top-4 right-4 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Welcome to Dermato</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Here's what you can do:</p>
+      <div className="grid sm:grid-cols-3 gap-4">
+        {ORIENTATION_ITEMS.map(({ icon: Icon, label, description }) => (
+          <div key={label} className="flex items-start gap-3">
+            <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{label}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 export default function PatientHomePage() {
   const { user } = useAuth()
   const patientId = user.patient_id
+  const welcomeSeenKey = `dermato_welcome_seen_${patientId}`
+  const [welcomeDismissed, setWelcomeDismissed] = useState(() => !!localStorage.getItem(welcomeSeenKey))
+  const dismissWelcome = () => {
+    localStorage.setItem(welcomeSeenKey, '1')
+    setWelcomeDismissed(true)
+  }
 
   const { data: patient } = useQuery({
     queryKey: ['patient', String(patientId)],
@@ -144,6 +189,8 @@ export default function PatientHomePage() {
         subtitle="Here's where your skin journey stands today."
         action={<LastUpdated timestamp={sessionsUpdatedAt} />}
       />
+
+      {!sessionsLoading && sessions.length === 0 && !welcomeDismissed && <WelcomeCard onDismiss={dismissWelcome} />}
 
       {priorityAlert && <Alert {...priorityAlert} />}
 

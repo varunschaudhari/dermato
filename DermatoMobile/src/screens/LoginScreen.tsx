@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
 
-type RootStackParamList = { Login: undefined; Register: undefined };
+type RootStackParamList = { Login: undefined; Register: undefined; ForgotPassword: undefined };
 
 export default function LoginScreen() {
   const [phone, setPhone] = useState('');
@@ -85,6 +85,15 @@ export default function LoginScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
+        onPress={() => navigation.navigate('ForgotPassword')}
+        style={styles.forgotLink}
+        accessibilityRole="button"
+        accessibilityLabel="Forgot password"
+      >
+        <Text style={styles.forgotLinkText}>Forgot password?</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         onPress={() => navigation.navigate('Register')}
         style={styles.registerLink}
         accessibilityRole="button"
@@ -113,6 +122,8 @@ const styles = StyleSheet.create({
   button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
+  forgotLink: { marginTop: 14 },
+  forgotLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.teal, fontWeight: '600' },
   registerLink: { marginTop: 20 },
   registerLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.secondaryText },
   registerLinkBold: { color: COLORS.teal, fontWeight: '700' },

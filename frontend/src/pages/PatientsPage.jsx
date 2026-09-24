@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { UserPlus, KeyRound, UserCheck, ChevronRight, Users, Upload, X, AlertTriangle } from 'lucide-react'
+import { UserPlus, KeyRound, UserCheck, ChevronRight, Users, Upload, X, AlertTriangle, Search } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { getPatients, createPatient, createPatientAccount, listUsers, assignDoctor, importPatientsCsv } from '../services/api'
@@ -12,6 +12,7 @@ import Badge from '../components/ui/Badge'
 import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import FormField from '../components/ui/FormField'
+import Tabs from '../components/ui/Tabs'
 
 function CreateAccountForm({ patient, onClose }) {
   const qc = useQueryClient()
@@ -141,16 +142,36 @@ export default function PatientsPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const toast = useToast()
+  const { user } = useAuth()
   const [form, setForm] = useState({ name: '', age: '', skin_type: '' })
   const [showForm, setShowForm] = useState(false)
   const [accountFormFor, setAccountFormFor] = useState(null)
   const [importResult, setImportResult] = useState(null)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('all')
   const csvInputRef = useRef(null)
 
   const { data: patients = [], isLoading } = useQuery({
     queryKey: ['patients'],
     queryFn: () => getPatients().then((r) => r.data),
   })
+
+  const unclaimedCount = useMemo(() => patients.filter((p) => !p.assigned_doctor_id).length, [patients])
+  const myPatientsCount = useMemo(
+    () => (user.role === 'dermatologist' ? patients.filter((p) => p.assigned_doctor_id === user.id).length : 0),
+    [patients, user]
+  )
+
+  const filteredPatients = useMemo(() => {
+    let list = patients
+    if (filter === 'unclaimed') list = list.filter((p) => !p.assigned_doctor_id)
+    else if (filter === 'mine') list = list.filter((p) => p.assigned_doctor_id === user.id)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase()
+      list = list.filter((p) => p.name.toLowerCase().includes(q))
+    }
+    return list
+  }, [patients, filter, search, user])
 
   const mutation = useMutation({
     mutationFn: createPatient,
@@ -270,45 +291,79 @@ export default function PatientsPage() {
           <EmptyState icon={Users} title="No patients yet" description="Add your first patient to get started." />
         </Card>
       ) : (
-        <div className="space-y-3">
-          {patients.map((p) => (
-            <Card key={p.id} className="hover:shadow-md transition p-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div
-                  className="cursor-pointer flex-1 min-w-0"
-                  onClick={() => navigate(`/progress/${p.id}`)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && navigate(`/progress/${p.id}`)}
-                  aria-label={`View chart for ${p.name}`}
-                >
-                  <p className="font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">Age {p.age} · {p.skin_type}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <DoctorAssignment patient={p} />
-                  <button
-                    onClick={() => setAccountFormFor(accountFormFor === p.id ? null : p.id)}
-                    className="inline-flex items-center gap-1 text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium"
-                  >
-                    <KeyRound className="w-3.5 h-3.5" />
-                    Create Login
-                  </button>
-                  <button
-                    onClick={() => navigate(`/progress/${p.id}`)}
-                    className="inline-flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400 hover:text-brand-700 dark:hover:text-brand-400 font-medium ml-auto sm:ml-0"
-                  >
-                    Progress
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-              {accountFormFor === p.id && (
-                <CreateAccountForm patient={p} onClose={() => setAccountFormFor(null)} />
-              )}
+        <>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <Tabs
+              tabs={[
+                { key: 'all', label: 'All', badge: patients.length },
+                ...(user.role === 'dermatologist' ? [{ key: 'mine', label: 'My Patients', badge: myPatientsCount }] : []),
+                { key: 'unclaimed', label: 'Unclaimed', badge: unclaimedCount },
+              ]}
+              active={filter}
+              onChange={setFilter}
+            />
+            <div className="relative sm:ml-auto sm:w-64">
+              <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name…"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl focus:border-brand-500"
+              />
+            </div>
+          </div>
+
+          {filteredPatients.length === 0 ? (
+            <Card>
+              <EmptyState
+                icon={Users}
+                title="No matching patients"
+                description="Try a different search or filter."
+              />
             </Card>
-          ))}
-        </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredPatients.map((p) => (
+                <Card key={p.id} className="hover:shadow-md transition p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div
+                      className="cursor-pointer flex-1 min-w-0"
+                      onClick={() => navigate(`/progress/${p.id}`)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && navigate(`/progress/${p.id}`)}
+                      aria-label={`View chart for ${p.name}`}
+                    >
+                      <p className="font-medium text-gray-900 dark:text-gray-100">{p.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">Age {p.age} · {p.skin_type}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <DoctorAssignment patient={p} />
+                      <button
+                        onClick={() => setAccountFormFor(accountFormFor === p.id ? null : p.id)}
+                        className="inline-flex items-center gap-1 text-xs text-brand-700 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 font-medium"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        Create Login
+                      </button>
+                      <button
+                        onClick={() => navigate(`/progress/${p.id}`)}
+                        className="inline-flex items-center gap-0.5 text-sm text-gray-500 dark:text-gray-400 hover:text-brand-700 dark:hover:text-brand-400 font-medium ml-auto sm:ml-0"
+                      >
+                        Progress
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {accountFormFor === p.id && (
+                    <CreateAccountForm patient={p} onClose={() => setAccountFormFor(null)} />
+                  )}
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

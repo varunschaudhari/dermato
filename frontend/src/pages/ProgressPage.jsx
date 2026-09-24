@@ -778,7 +778,9 @@ export default function ProgressPage() {
                             return (
                               <Badge key={key} color={meta?.color} icon={meta?.icon}>
                                 {label}: {level}
-                                {wsi != null && <span className="font-mono tabular-nums opacity-70"> · {wsi.toFixed(2)}</span>}
+                                {user.role !== 'patient' && wsi != null && (
+                                  <span className="font-mono tabular-nums opacity-70"> · {wsi.toFixed(2)}</span>
+                                )}
                               </Badge>
                             )
                           })}

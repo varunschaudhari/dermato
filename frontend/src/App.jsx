@@ -16,6 +16,7 @@ import ProgressPage from './pages/ProgressPage'
 import AdminUsersPage from './pages/AdminUsersPage'
 import AdminContentPage from './pages/AdminContentPage'
 import DashboardPage from './pages/DashboardPage'
+import DoctorWorklistPage from './pages/DoctorWorklistPage'
 import ReportPage from './pages/ReportPage'
 import PatientChartPage from './pages/PatientChartPage'
 import ProfilePage from './pages/ProfilePage'
@@ -97,6 +98,14 @@ export default function App() {
                   element={
                     <ProtectedRoute roles={['admin']}>
                       <DashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/worklist"
+                  element={
+                    <ProtectedRoute roles={['dermatologist']}>
+                      <DoctorWorklistPage />
                     </ProtectedRoute>
                   }
                 />

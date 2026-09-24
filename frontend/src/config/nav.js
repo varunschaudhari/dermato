@@ -23,6 +23,7 @@ export function getNavLinks(user) {
 
   return [
     ...(user.role === 'admin' ? [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, primary: true }] : []),
+    ...(user.role === 'dermatologist' ? [{ to: '/worklist', label: 'Worklist', icon: LayoutDashboard, primary: true }] : []),
     { to: '/', label: 'Analyze', icon: ScanFace, primary: true },
     { to: '/patients', label: 'Patients', icon: Users, primary: true },
     { to: '/messages', label: 'Messages', icon: MessageCircle, primary: true },
