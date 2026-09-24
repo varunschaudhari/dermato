@@ -147,3 +147,61 @@ def test_busy_times_rejects_malformed_date(client, auth_headers):
         headers=auth_headers,
     )
     assert res.status_code == 400
+
+
+def _weekday_key(date_str):
+    from datetime import datetime
+
+    return ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][datetime.strptime(date_str, "%Y-%m-%d").weekday()]
+
+
+def test_available_slots_unconfigured_when_no_working_hours_set(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/available-slots",
+        params={"date": "2027-07-05"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json() == {"configured": False, "slots": []}
+
+
+def test_available_slots_respects_working_hours_and_excludes_booked_time(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    patient_id = _create_patient(client, auth_headers)
+    date_str = "2027-07-06"
+
+    res = client.patch(
+        "/api/auth/me/working-hours",
+        json={"working_hours": {_weekday_key(date_str): {"start": "09:00", "end": "10:00"}}},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+
+    client.post(
+        "/api/appointments/",
+        json={"patient_id": patient_id, "doctor_id": doctor_id, "scheduled_at": f"{date_str}T09:00:00"},
+        headers=auth_headers,
+    )
+
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/available-slots",
+        params={"date": date_str},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["configured"] is True
+    times = [t[11:16] for t in body["slots"]]
+    assert "09:00" not in times
+    assert "09:30" in times
+
+
+def test_available_slots_rejects_malformed_date(client, auth_headers):
+    doctor_id = _get_own_id(client, auth_headers)
+    res = client.get(
+        f"/api/appointments/doctors/{doctor_id}/available-slots",
+        params={"date": "not-a-date"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400

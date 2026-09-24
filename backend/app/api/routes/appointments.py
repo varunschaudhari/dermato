@@ -9,6 +9,15 @@ from app.services.notifier import notify_user
 router = APIRouter()
 
 DURATION_MINUTES = 30
+_WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+
+
+def _conflicts(candidate, busy_times) -> bool:
+    """Same fixed-duration window used by create_appointment's conflict
+    check, factored out so the available-slots computation below never
+    offers a time that would actually 409 on submit."""
+    window = timedelta(minutes=DURATION_MINUTES - 1)
+    return any(candidate - window < b < candidate + window for b in busy_times)
 
 
 def _enrich(db, doc) -> dict:
@@ -27,7 +36,17 @@ def _enrich(db, doc) -> dict:
 @router.get("/doctors", response_model=list[DoctorOption])
 def list_available_doctors(db=Depends(get_db), current_user=Depends(get_current_user)):
     docs = db.users.find({"role": "dermatologist", "is_active": True})
-    return [{"id": d["_id"], "full_name": d["full_name"]} for d in docs]
+    return [
+        {
+            "id": d["_id"],
+            "full_name": d["full_name"],
+            "specialization": d.get("specialization"),
+            "credentials": d.get("credentials"),
+            "bio": d.get("bio"),
+            "avatar_url": f"/uploads/{d['avatar_filename']}" if d.get("avatar_filename") else None,
+        }
+        for d in docs
+    ]
 
 
 @router.get("/doctors/{doctor_id}/busy-times")
@@ -52,6 +71,56 @@ def get_doctor_busy_times(
         }
     ).sort("scheduled_at", 1)
     return [d["scheduled_at"] for d in docs]
+
+
+@router.get("/doctors/{doctor_id}/available-slots")
+def get_doctor_available_slots(
+    doctor_id: int, date: str, db=Depends(get_db), current_user=Depends(get_current_user)
+):
+    """Bookable slot start-times for this doctor on `date`, computed from
+    their working_hours (set via PATCH /auth/me/working-hours) minus already
+    -busy times and past-today times. `configured: false` means this doctor
+    hasn't set up working hours yet -- the frontend falls back to freeform
+    date/time entry in that case rather than showing an empty slot grid."""
+    try:
+        day_start = datetime.strptime(date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+
+    doctor = db.users.find_one({"_id": doctor_id, "role": "dermatologist"})
+    working_hours = (doctor or {}).get("working_hours") or {}
+    window = working_hours.get(_WEEKDAY_KEYS[day_start.weekday()])
+    if not window:
+        return {"configured": False, "slots": []}
+
+    try:
+        start_h, start_m = (int(x) for x in window["start"].split(":"))
+        end_h, end_m = (int(x) for x in window["end"].split(":"))
+    except (KeyError, ValueError):
+        return {"configured": False, "slots": []}
+
+    slot = day_start.replace(hour=start_h, minute=start_m)
+    day_end = day_start.replace(hour=end_h, minute=end_m)
+
+    busy_times = [
+        d["scheduled_at"]
+        for d in db.appointments.find(
+            {
+                "doctor_id": doctor_id,
+                "status": "scheduled",
+                "scheduled_at": {"$gte": day_start, "$lt": day_start + timedelta(days=1)},
+            }
+        )
+    ]
+
+    now = datetime.utcnow()
+    slots = []
+    while slot + timedelta(minutes=DURATION_MINUTES) <= day_end:
+        if slot > now and not _conflicts(slot, busy_times):
+            slots.append(slot)
+        slot += timedelta(minutes=DURATION_MINUTES)
+
+    return {"configured": True, "slots": slots}
 
 
 @router.get("/", response_model=list[AppointmentOut])

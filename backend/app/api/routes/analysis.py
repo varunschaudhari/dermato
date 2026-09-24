@@ -1,6 +1,4 @@
-import os
 import sys
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -17,6 +15,7 @@ from app.services.severity_classifier import classify_acne, classify_pigmentatio
 from app.services.recommendation_engine import get_recommendations
 from app.services.treatment_tracker import compute_effective_severity, update_treatment_plan
 from app.services.notifier import notify_user
+from app.services.uploads import validate_image as _read_and_validate, save_upload as _save_upload
 
 # backend/training/inference.py is a sibling of backend/app/, not a sub-package of it
 _BACKEND_ROOT = Path(__file__).resolve().parents[3]
@@ -36,25 +35,6 @@ router = APIRouter()
 # The acne severity classifier has a 4th "clear" class; the recommendation
 # table only defines mild/moderate/severe tiers.
 _SEVERITY_ALIAS = {"clear": "mild"}
-
-
-async def _read_and_validate(file: UploadFile) -> bytes:
-    if not file.content_type.startswith("image/"):
-        raise HTTPException(status_code=400, detail="File must be an image")
-    contents = await file.read()
-    max_bytes = settings.MAX_IMAGE_SIZE_MB * 1024 * 1024
-    if len(contents) > max_bytes:
-        raise HTTPException(status_code=413, detail=f"Image exceeds the {settings.MAX_IMAGE_SIZE_MB}MB limit")
-    return contents
-
-
-def _save_upload(contents: bytes, original_filename: str) -> str:
-    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    ext = os.path.splitext(original_filename or "")[1] or ".jpg"
-    filename = f"{uuid.uuid4().hex}{ext}"
-    with open(os.path.join(settings.UPLOAD_DIR, filename), "wb") as f:
-        f.write(contents)
-    return filename
 
 
 @router.post("/quality-check")

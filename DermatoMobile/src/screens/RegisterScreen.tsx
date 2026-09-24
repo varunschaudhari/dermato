@@ -6,6 +6,7 @@ import { User, Mail, Phone, Lock, Calendar, Eye, EyeOff } from 'lucide-react-nat
 import { useAuth } from '../context/AuthContext';
 import { registerPatient, getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
+import FormError from '../components/FormError';
 
 type RootStackParamList = { Login: undefined; Register: undefined };
 
@@ -45,7 +46,7 @@ export default function RegisterScreen() {
         <Text style={styles.title}>Create your account</Text>
         <Text style={styles.subtitle}>Sign up to start tracking your skin health</Text>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <FormError message={error} /> : null}
 
         <Text style={styles.label}>Full name</Text>
         <View style={styles.inputWrapper}>
@@ -180,7 +181,6 @@ const styles = StyleSheet.create({
   chipTextActive: { color: COLORS.teal, fontWeight: '600' },
   button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
   loginLink: { marginTop: 20, marginBottom: 20 },
   loginLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.secondaryText },
   loginLinkBold: { color: COLORS.teal, fontWeight: '700' },

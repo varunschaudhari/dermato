@@ -10,6 +10,8 @@ import {
 } from '../api/client';
 import { COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import { Bell } from 'lucide-react-native';
 
 type RootStackParamList = { MainTabs: { screen: string } | undefined };
 
@@ -99,7 +101,7 @@ export default function NotificationsScreen() {
           contentContainerStyle={{ padding: 20, paddingTop: 8 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
           ListEmptyComponent={
-            !loading ? <Text style={styles.emptyText}>You're all caught up — no notifications yet.</Text> : undefined
+            !loading ? <EmptyState icon={Bell} title="You're all caught up" description="No notifications yet." /> : undefined
           }
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -133,7 +135,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, paddingHorizontal: 20, marginTop: 8 },
   backLink: { fontSize: 14, fontWeight: '600', color: COLORS.teal },
   markAll: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
-  emptyText: { fontSize: 13, color: COLORS.mutedGray, textAlign: 'center', marginTop: 40 },
   card: {
     flexDirection: 'row',
     alignItems: 'flex-start',

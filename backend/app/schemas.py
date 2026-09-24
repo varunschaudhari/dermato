@@ -157,6 +157,16 @@ class UserOut(BaseModel):
     created_at: datetime
     patient_id: Optional[int] = None
     consent_given_at: Optional[datetime] = None
+    bio: Optional[str] = None
+    specialization: Optional[str] = None
+    credentials: Optional[str] = None
+    avatar_filename: Optional[str] = None
+    working_hours: Optional[dict] = None
+
+    @computed_field
+    @property
+    def avatar_url(self) -> Optional[str]:
+        return f"/uploads/{self.avatar_filename}" if self.avatar_filename else None
 
 
 class PatientAccountCreate(BaseModel):
@@ -169,6 +179,13 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    bio: Optional[str] = None
+    specialization: Optional[str] = None
+    credentials: Optional[str] = None
+
+
+class WorkingHoursUpdate(BaseModel):
+    working_hours: dict[str, dict[str, str]]
 
 
 class PasswordChange(BaseModel):
@@ -265,6 +282,10 @@ class AppointmentOut(BaseModel):
 class DoctorOption(BaseModel):
     id: int
     full_name: Optional[str] = None
+    specialization: Optional[str] = None
+    credentials: Optional[str] = None
+    bio: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class ImportError_(BaseModel):

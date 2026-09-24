@@ -96,3 +96,100 @@ def test_list_users_requires_admin(client, auth_headers):
     # auth_headers belongs to a dermatologist, not an admin
     res = client.get("/api/auth/users", headers=auth_headers)
     assert res.status_code == 403
+
+
+def test_update_me_persists_doctor_profile_fields(client, auth_headers):
+    res = client.patch(
+        "/api/auth/me",
+        json={"bio": "15 years treating acne and pigmentation.", "specialization": "Cosmetic Dermatology", "credentials": "MBBS, MD"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["bio"] == "15 years treating acne and pigmentation."
+    assert body["specialization"] == "Cosmetic Dermatology"
+    assert body["credentials"] == "MBBS, MD"
+
+
+def test_upload_avatar_sets_avatar_url(client, auth_headers):
+    import io
+
+    import cv2
+    import numpy as np
+
+    image = np.full((20, 20, 3), (100, 120, 140), dtype=np.uint8)
+    ok, encoded = cv2.imencode(".jpg", image)
+    assert ok
+
+    res = client.post(
+        "/api/auth/me/avatar",
+        files={"file": ("avatar.jpg", io.BytesIO(encoded.tobytes()), "image/jpeg")},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["avatar_url"]
+    assert body["avatar_url"].startswith("/uploads/")
+
+
+def test_upload_avatar_rejects_non_image(client, auth_headers):
+    import io
+
+    res = client.post(
+        "/api/auth/me/avatar",
+        files={"file": ("not-an-image.txt", io.BytesIO(b"hello"), "text/plain")},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400
+
+
+def test_working_hours_update_and_round_trip(client, auth_headers):
+    res = client.patch(
+        "/api/auth/me/working-hours",
+        json={"working_hours": {"mon": {"start": "09:00", "end": "17:00"}}},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["working_hours"] == {"mon": {"start": "09:00", "end": "17:00"}}
+
+
+def test_working_hours_rejects_unknown_day(client, auth_headers):
+    res = client.patch(
+        "/api/auth/me/working-hours",
+        json={"working_hours": {"someday": {"start": "09:00", "end": "17:00"}}},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400
+
+
+def test_working_hours_rejects_bad_time_format(client, auth_headers):
+    res = client.patch(
+        "/api/auth/me/working-hours",
+        json={"working_hours": {"mon": {"start": "9am", "end": "17:00"}}},
+        headers=auth_headers,
+    )
+    assert res.status_code == 400
+
+
+def test_working_hours_rejected_for_patient(client, auth_headers):
+    # Register a patient account and confirm it can't set working hours.
+    res = client.post(
+        "/api/auth/register-patient",
+        json={
+            "phone": "7000099001",
+            "email": "workinghours.patient@example.com",
+            "password": "testpassword123",
+            "full_name": "Patient X",
+            "age": 30,
+            "skin_type": "normal",
+        },
+    )
+    token = res.json()["access_token"]
+    patient_headers = {"Authorization": f"Bearer {token}"}
+
+    res = client.patch(
+        "/api/auth/me/working-hours",
+        json={"working_hours": {"mon": {"start": "09:00", "end": "17:00"}}},
+        headers=patient_headers,
+    )
+    assert res.status_code == 403

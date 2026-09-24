@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowRight } from 'lucide-react-native';
+import { ArrowRight, TrendingUp, ClipboardList } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
@@ -18,7 +18,8 @@ import {
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import { computeTreatmentProgress } from '../utils/treatmentProgress';
 import ErrorState from '../components/ErrorState';
-import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
+import EmptyState from '../components/EmptyState';
 
 type RootStackParamList = { Messages: undefined };
 
@@ -123,22 +124,62 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
   );
 }
 
-function BeforeAfterCard({ first, latest }: { first: SessionOut; latest: SessionOut }) {
+function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
+  const [leftIdx, setLeftIdx] = useState<number | null>(null);
+  const [rightIdx, setRightIdx] = useState<number | null>(null);
+  const effectiveLeft = leftIdx ?? 0;
+  const effectiveRight = rightIdx ?? sessions.length - 1;
+  const left = sessions[effectiveLeft];
+  const right = sessions[effectiveRight];
+
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Before &amp; After</Text>
-      <Text style={styles.cardSubtitle}>Tap the photo to compare your first and most recent scan</Text>
-      <BeforeAfterPhotoToggle
-        beforeUri={absoluteUrl(first.image_url)}
-        afterUri={absoluteUrl(latest.image_url)}
-        beforeLabel="Before (first)"
-        afterLabel="After (latest)"
+      <Text style={styles.cardSubtitle}>Drag the photo to compare any two visits</Text>
+
+      <Text style={styles.compareChipsLabel}>Before</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
+        {sessions.map((s, i) => (
+          <TouchableOpacity
+            key={s.id}
+            style={[styles.compareChip, i === effectiveLeft && styles.compareChipActive]}
+            onPress={() => setLeftIdx(i)}
+            disabled={i === effectiveRight}
+            accessibilityRole="button"
+            accessibilityLabel={`Compare from ${new Date(s.captured_at).toLocaleDateString()}`}
+          >
+            <Text style={[styles.compareChipText, i === effectiveLeft && styles.compareChipTextActive]}>
+              {new Date(s.captured_at).toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <Text style={styles.compareChipsLabel}>After</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
+        {sessions.map((s, i) => (
+          <TouchableOpacity
+            key={s.id}
+            style={[styles.compareChip, i === effectiveRight && styles.compareChipActive]}
+            onPress={() => setRightIdx(i)}
+            disabled={i === effectiveLeft}
+            accessibilityRole="button"
+            accessibilityLabel={`Compare to ${new Date(s.captured_at).toLocaleDateString()}`}
+          >
+            <Text style={[styles.compareChipText, i === effectiveRight && styles.compareChipTextActive]}>
+              {new Date(s.captured_at).toLocaleDateString()}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <BeforeAfterSlider
+        beforeUri={absoluteUrl(left.image_url)}
+        afterUri={absoluteUrl(right.image_url)}
+        beforeLabel={new Date(left.captured_at).toLocaleDateString()}
+        afterLabel={new Date(right.captured_at).toLocaleDateString()}
         imageStyle={styles.compareImage}
       />
-      <View style={styles.compareDateRow}>
-        <Text style={styles.compareDateText}>{new Date(first.captured_at).toLocaleDateString()}</Text>
-        <Text style={styles.compareDateText}>{new Date(latest.captured_at).toLocaleDateString()}</Text>
-      </View>
     </View>
   );
 }
@@ -298,7 +339,7 @@ export default function ProgressScreen() {
       ) : (
         <>
           {sessions.length === 0 ? (
-            <Text style={styles.emptyText}>No sessions recorded yet — run an analysis to start tracking.</Text>
+            <EmptyState icon={TrendingUp} title="No sessions yet" description="Run an analysis to start tracking your progress." />
           ) : (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>Severity Over Time</Text>
@@ -309,12 +350,12 @@ export default function ProgressScreen() {
             </View>
           )}
 
-          {sessions.length >= 2 && <BeforeAfterCard first={sessions[0]} latest={sessions[sessions.length - 1]} />}
+          {sessions.length >= 2 && <BeforeAfterCard sessions={sessions} />}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Treatment Plans</Text>
             {plans.length === 0 ? (
-              <Text style={styles.emptyText}>No treatment plans yet.</Text>
+              <EmptyState icon={ClipboardList} title="No treatment plans yet" />
             ) : (
               plans.map((p) => {
                 const progress = computeTreatmentProgress(p);
@@ -426,9 +467,13 @@ const styles = StyleSheet.create({
   historyRow: { paddingVertical: 6, borderTopWidth: 1, borderTopColor: COLORS.border },
   historyLabel: { fontSize: 10, color: COLORS.mutedGray },
   historyValue: { fontSize: 13, color: '#374151', marginTop: 1 },
-  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider },
-  compareDateRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  compareDateText: { fontSize: 11, color: COLORS.mutedGray },
+  compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider, marginTop: 10 },
+  compareChipsLabel: { fontSize: 11, color: COLORS.mutedGray, marginTop: 10, marginBottom: 4 },
+  compareChipsRow: { gap: 6 },
+  compareChip: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  compareChipActive: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
+  compareChipText: { fontSize: 11, color: COLORS.heading, fontWeight: '600' },
+  compareChipTextActive: { color: '#fff' },
   adherencePrompt: { marginTop: 8, width: '100%' },
   adherenceLabel: { fontSize: 11, color: COLORS.mutedGray, marginBottom: 6 },
   adherenceRow: { flexDirection: 'row', gap: 6 },

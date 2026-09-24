@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { AlertTriangle, Info, CheckCircle2, Bell } from 'lucide-react'
+import { AlertTriangle, Info, CheckCircle2, Bell, XCircle } from 'lucide-react'
 import Button from './Button'
 
 // One banner component for every "here's something worth your attention" spot
@@ -22,6 +22,10 @@ const VARIANTS = {
   neutral: {
     classes: 'bg-gray-50 dark:bg-gray-800/50 border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-300',
     defaultIcon: Bell,
+  },
+  error: {
+    classes: 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-800 text-red-700 dark:text-red-400',
+    defaultIcon: XCircle,
   },
 }
 

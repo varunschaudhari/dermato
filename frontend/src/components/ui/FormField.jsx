@@ -45,6 +45,8 @@ export default function FormField({
           <select {...inputProps} className={fieldClasses}>
             {children}
           </select>
+        ) : as === 'textarea' ? (
+          <textarea {...inputProps} className={`${fieldClasses} resize-none`} />
         ) : (
           <input type={resolvedType} {...inputProps} className={fieldClasses} />
         )}

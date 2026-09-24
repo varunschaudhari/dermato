@@ -540,6 +540,15 @@ export default function ProgressPage() {
     if (target) setActiveTab(target)
   }, [location.hash])
 
+  // null = "default to the two most recent sessions" -- only pinned to
+  // specific indices once the patient actually picks a pair below.
+  const [compareLeftIdx, setCompareLeftIdx] = useState(null)
+  const [compareRightIdx, setCompareRightIdx] = useState(null)
+  useEffect(() => {
+    setCompareLeftIdx(null)
+    setCompareRightIdx(null)
+  }, [patientId])
+
   useEffect(() => {
     if (!location.hash) return
     const id = location.hash.slice(1)
@@ -572,8 +581,10 @@ export default function ProgressPage() {
     pore: bandScore(s.pore_severity),
   }))
 
-  const compareFirstScore = computeSkinScoreFromSession(sessions[sessions.length - 2])
-  const compareLastScore = computeSkinScoreFromSession(sessions[sessions.length - 1])
+  const effectiveLeftIdx = compareLeftIdx ?? sessions.length - 2
+  const effectiveRightIdx = compareRightIdx ?? sessions.length - 1
+  const compareFirstScore = computeSkinScoreFromSession(sessions[effectiveLeftIdx])
+  const compareLastScore = computeSkinScoreFromSession(sessions[effectiveRightIdx])
   const compareDelta = compareFirstScore != null && compareLastScore != null ? compareLastScore - compareFirstScore : null
 
   const deleteMutation = useMutation({
@@ -690,10 +701,37 @@ export default function ProgressPage() {
 
                 {sessions.length >= 2 && (
                   <Card>
-                    <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                      <Images className="w-5 h-5 text-brand-600" />
-                      Before vs. After
-                    </h2>
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                      <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Images className="w-5 h-5 text-brand-600" />
+                        Before vs. After
+                      </h2>
+                      <div className="flex items-center gap-2 text-xs">
+                        <select
+                          value={effectiveLeftIdx}
+                          onChange={(e) => setCompareLeftIdx(Number(e.target.value))}
+                          className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
+                        >
+                          {sessions.map((s, i) => (
+                            <option key={s.id} value={i} disabled={i === effectiveRightIdx}>
+                              {new Date(s.captured_at).toLocaleDateString()}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-gray-400">vs.</span>
+                        <select
+                          value={effectiveRightIdx}
+                          onChange={(e) => setCompareRightIdx(Number(e.target.value))}
+                          className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
+                        >
+                          {sessions.map((s, i) => (
+                            <option key={s.id} value={i} disabled={i === effectiveLeftIdx}>
+                              {new Date(s.captured_at).toLocaleDateString()}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                     <div className="relative">
                       {compareDelta != null && compareDelta !== 0 && (
                         <div
@@ -706,15 +744,15 @@ export default function ProgressPage() {
                           {compareDelta > 0 ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
                           {compareDelta > 0 ? '+' : ''}{compareDelta} pts
                           <span className="font-mono text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                            since previous visit
+                            between selected visits
                           </span>
                         </div>
                       )}
                       <ReactCompareImage
-                        leftImage={sessions[sessions.length - 2].image_url}
-                        rightImage={sessions[sessions.length - 1].image_url}
-                        leftImageLabel="Previous visit"
-                        rightImageLabel="Latest visit"
+                        leftImage={sessions[effectiveLeftIdx].image_url}
+                        rightImage={sessions[effectiveRightIdx].image_url}
+                        leftImageLabel={new Date(sessions[effectiveLeftIdx].captured_at).toLocaleDateString()}
+                        rightImageLabel={new Date(sessions[effectiveRightIdx].captured_at).toLocaleDateString()}
                       />
                     </div>
                   </Card>

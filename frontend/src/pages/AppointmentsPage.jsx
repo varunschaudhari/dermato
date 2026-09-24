@@ -1,7 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CalendarPlus, CalendarX, CalendarCheck, Clock, CalendarClock } from 'lucide-react'
-import { getAppointments, getAvailableDoctors, getDoctorBusyTimes, createAppointment, updateAppointmentStatus, getPatients } from '../services/api'
+import {
+  getAppointments,
+  getAvailableDoctors,
+  getDoctorBusyTimes,
+  getAvailableSlots,
+  createAppointment,
+  updateAppointmentStatus,
+  getPatients,
+} from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import PageHeader from '../components/ui/PageHeader'
@@ -13,6 +21,7 @@ import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import LastUpdated from '../components/ui/LastUpdated'
 import QueryError from '../components/ui/QueryError'
+import Alert from '../components/ui/Alert'
 
 const STATUS_META = {
   scheduled: { color: 'brand', icon: CalendarClock },
@@ -43,6 +52,14 @@ function BookingForm({ isPatient, patientId }) {
     enabled: !!form.doctor_id && !!form.date,
   })
 
+  const { data: slotsData } = useQuery({
+    queryKey: ['available-slots', form.doctor_id, form.date],
+    queryFn: () => getAvailableSlots(form.doctor_id, form.date).then((r) => r.data),
+    enabled: !!form.doctor_id && !!form.date,
+  })
+  const slotsConfigured = slotsData?.configured
+  const slots = slotsData?.slots || []
+
   const mutation = useMutation({
     mutationFn: (payload) => createAppointment(payload),
     onSuccess: () => {
@@ -72,7 +89,7 @@ function BookingForm({ isPatient, patientId }) {
         Book an Appointment
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2">{error}</p>}
+        {error && <Alert variant="error" title={error} />}
 
         {!isPatient && (
           <FormField
@@ -89,44 +106,111 @@ function BookingForm({ isPatient, patientId }) {
           </FormField>
         )}
 
-        <FormField
-          label="Dermatologist"
-          as="select"
-          value={form.doctor_id}
-          onChange={(e) => setForm({ ...form, doctor_id: e.target.value })}
-          required
-        >
-          <option value="">Select a dermatologist…</option>
-          {doctors.map((d) => (
-            <option key={d.id} value={d.id}>{d.full_name}</option>
-          ))}
-        </FormField>
-
-        <div className="grid grid-cols-2 gap-3">
-          <FormField
-            label="Date"
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm({ ...form, date: e.target.value })}
-            min={new Date().toISOString().split('T')[0]}
-            required
-          />
-          <FormField
-            label="Time"
-            type="time"
-            value={form.time}
-            onChange={(e) => setForm({ ...form, time: e.target.value })}
-            required
-          />
+        <div>
+          <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Dermatologist</label>
+          <div className="flex flex-wrap gap-2">
+            {doctors.map((d) => {
+              const active = String(form.doctor_id) === String(d.id)
+              return (
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, doctor_id: d.id, time: '' })}
+                  className={`flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full border text-sm transition-colors ${
+                    active
+                      ? 'bg-brand-600 border-brand-600 text-white'
+                      : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-brand-400'
+                  }`}
+                >
+                  {d.avatar_url ? (
+                    <img src={d.avatar_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <span
+                      className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-semibold shrink-0 ${
+                        active ? 'bg-white/20 text-white' : 'bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300'
+                      }`}
+                    >
+                      {(d.full_name || '?').charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-left">
+                    <span className="block leading-tight">{d.full_name}</span>
+                    {d.specialization && (
+                      <span className={`block text-[11px] leading-tight ${active ? 'text-white/80' : 'text-gray-400'}`}>
+                        {d.specialization}
+                      </span>
+                    )}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
-        {form.doctor_id && form.date && busyTimes.length > 0 && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2">
-            Already booked that day:{' '}
-            {busyTimes
-              .map((t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
-              .join(', ')}
-          </p>
+        <FormField
+          label="Date"
+          type="date"
+          value={form.date}
+          onChange={(e) => setForm({ ...form, date: e.target.value, time: '' })}
+          min={new Date().toISOString().split('T')[0]}
+          required
+        />
+
+        {form.doctor_id && form.date && slotsConfigured && (
+          <div>
+            <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Available times</label>
+            {slots.length === 0 ? (
+              <p className="text-xs text-gray-400">No open slots that day — try another date.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {slots.map((t) => {
+                  const timeValue = new Date(t).toTimeString().slice(0, 5)
+                  const active = form.time === timeValue
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setForm({ ...form, time: timeValue })}
+                      className={`px-3 py-1.5 rounded-full border text-sm transition-colors ${
+                        active
+                          ? 'bg-brand-600 border-brand-600 text-white'
+                          : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:border-brand-400'
+                      }`}
+                    >
+                      {new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {form.doctor_id && form.date && slotsData && !slotsConfigured && (
+          <>
+            <FormField
+              label="Time"
+              type="time"
+              value={form.time}
+              onChange={(e) => setForm({ ...form, time: e.target.value })}
+              required
+            />
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-2">
+              This doctor hasn't set up available hours yet — pick any time.
+            </p>
+            {busyTimes.length > 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 -mt-2">
+                Already booked that day:{' '}
+                {busyTimes
+                  .map((t) => new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }))
+                  .join(', ')}
+              </p>
+            )}
+          </>
+        )}
+
+        {(!form.doctor_id || !form.date) && (
+          <FormField label="Time" type="time" value={form.time} disabled />
         )}
 
         <FormField

@@ -81,6 +81,11 @@ export const login = (phone: string, password: string) => {
   });
 };
 
+export interface WorkingHoursWindow {
+  start: string;
+  end: string;
+}
+
 export interface UserOut {
   id: number;
   phone?: string | null;
@@ -91,12 +96,31 @@ export interface UserOut {
   created_at: string;
   patient_id?: number | null;
   consent_given_at?: string | null;
+  bio?: string | null;
+  specialization?: string | null;
+  credentials?: string | null;
+  avatar_url?: string | null;
+  working_hours?: Record<string, WorkingHoursWindow> | null;
 }
 
 export const getMe = () => api.get<UserOut>('/auth/me');
 
 export const updateMe = (data: { full_name?: string; phone?: string; email?: string }) =>
   api.patch<UserOut>('/auth/me', data);
+
+export const updateDoctorProfile = (data: { bio?: string; specialization?: string; credentials?: string }) =>
+  api.patch<UserOut>('/auth/me', data);
+
+export const uploadAvatar = (photo: { uri: string; type: string; name: string }) => {
+  const formData = new FormData();
+  formData.append('file', { uri: photo.uri, type: photo.type, name: photo.name } as any);
+  return api.post<UserOut>('/auth/me/avatar', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+};
+
+export const updateWorkingHours = (workingHours: Record<string, WorkingHoursWindow>) =>
+  api.patch<UserOut>('/auth/me/working-hours', { working_hours: workingHours });
 
 export const changePassword = (data: { current_password: string; new_password: string }) =>
   api.post('/auth/me/password', data);
@@ -258,12 +282,24 @@ export const markAllNotificationsRead = () => api.post('/notifications/read-all'
 export interface DoctorOption {
   id: number;
   full_name: string | null;
+  specialization?: string | null;
+  credentials?: string | null;
+  bio?: string | null;
+  avatar_url?: string | null;
 }
 
 export const getAvailableDoctors = () => api.get<DoctorOption[]>('/appointments/doctors');
 
 export const getDoctorBusyTimes = (doctorId: number, date: string) =>
   api.get<string[]>(`/appointments/doctors/${doctorId}/busy-times`, { params: { date } });
+
+export interface AvailableSlots {
+  configured: boolean;
+  slots: string[];
+}
+
+export const getAvailableSlots = (doctorId: number, date: string) =>
+  api.get<AvailableSlots>(`/appointments/doctors/${doctorId}/available-slots`, { params: { date } });
 
 export interface AppointmentOut {
   id: number;

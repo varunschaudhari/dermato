@@ -15,10 +15,14 @@ import { useAuth } from '../context/AuthContext';
 import { getMessages, sendMessage, MessageOut } from '../api/client';
 import { COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import { useToast } from '../context/ToastContext';
+import { MessageSquare } from 'lucide-react-native';
 
 export default function MessagesScreen() {
   const { patientId } = useAuth();
   const navigation = useNavigation();
+  const toast = useToast();
   const [messages, setMessages] = useState<MessageOut[]>([]);
   const [body, setBody] = useState('');
   const [sending, setSending] = useState(false);
@@ -58,6 +62,9 @@ export default function MessagesScreen() {
       await sendMessage(patientId, text);
       await load();
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch {
+      toast.error("Message didn't send. Try again.");
+      setBody(text);
     } finally {
       setSending(false);
     }
@@ -89,7 +96,7 @@ export default function MessagesScreen() {
           contentContainerStyle={{ padding: 20, paddingTop: 8, flexGrow: 1 }}
           onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No messages yet — start the conversation with your dermatologist.</Text>
+            <EmptyState icon={MessageSquare} title="No messages yet" description="Start the conversation with your dermatologist." />
           }
           renderItem={({ item }) => {
             const mine = item.sender_role === 'patient';
@@ -139,7 +146,6 @@ const styles = StyleSheet.create({
   headerRow: { paddingHorizontal: 20, paddingTop: 20 },
   backLink: { fontSize: 14, fontWeight: '600', color: COLORS.teal },
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, paddingHorizontal: 20, marginTop: 6 },
-  emptyText: { fontSize: 13, color: COLORS.mutedGray, textAlign: 'center', marginTop: 40 },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   bubbleRow: { flexDirection: 'row', marginBottom: 10 },
   bubbleRowMine: { justifyContent: 'flex-end' },

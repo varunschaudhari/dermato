@@ -47,6 +47,12 @@ export const forgotPassword = (email) => api.post('/auth/forgot-password', { ema
 export const resetPassword = (token, new_password) => api.post('/auth/reset-password', { token, new_password })
 export const getMe = () => api.get('/auth/me')
 export const updateMe = (data) => api.patch('/auth/me', data)
+export const uploadAvatar = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  return api.post('/auth/me/avatar', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+export const updateWorkingHours = (workingHours) => api.patch('/auth/me/working-hours', { working_hours: workingHours })
 export const changePassword = (data) => api.post('/auth/me/password', data)
 export const giveConsent = () => api.post('/auth/me/consent')
 export const listUsers = () => api.get('/auth/users')
@@ -105,6 +111,8 @@ export const getAppointments = () => api.get('/appointments/')
 export const getAvailableDoctors = () => api.get('/appointments/doctors')
 export const getDoctorBusyTimes = (doctorId, date) =>
   api.get(`/appointments/doctors/${doctorId}/busy-times`, { params: { date } })
+export const getAvailableSlots = (doctorId, date) =>
+  api.get(`/appointments/doctors/${doctorId}/available-slots`, { params: { date } })
 export const createAppointment = (data) => api.post('/appointments/', data)
 export const updateAppointmentStatus = (id, status) => api.patch(`/appointments/${id}/status`, { status })
 

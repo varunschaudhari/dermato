@@ -5,6 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { getPatientSessions, absoluteUrl, SessionOut } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
+import { ScanFace } from 'lucide-react-native';
 
 export default function HistoryScreen() {
   const { patientId } = useAuth();
@@ -40,7 +42,9 @@ export default function HistoryScreen() {
           contentContainerStyle={{ padding: 20, paddingTop: 8 }}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
           ListEmptyComponent={
-            !loading ? <Text style={styles.emptyText}>No scans yet — run your first analysis to start tracking.</Text> : undefined
+            !loading ? (
+              <EmptyState icon={ScanFace} title="No scans yet" description="Run your first analysis to start tracking." />
+            ) : undefined
           }
           renderItem={({ item }) => (
             <View style={styles.card}>
@@ -85,7 +89,6 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, paddingHorizontal: 20, paddingTop: 20 },
-  emptyText: { fontSize: 13, color: COLORS.mutedGray, textAlign: 'center', marginTop: 40 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: COLORS.border },
   cardHeader: { flexDirection: 'row', gap: 12 },
   thumb: { width: 56, height: 56, borderRadius: 10, backgroundColor: COLORS.divider },

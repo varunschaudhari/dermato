@@ -6,6 +6,7 @@ import { User, Lock, Eye, EyeOff } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
+import FormError from '../components/FormError';
 
 type RootStackParamList = { Login: undefined; Register: undefined; ForgotPassword: undefined };
 
@@ -38,7 +39,7 @@ export default function LoginScreen() {
       <Text style={styles.title}>Welcome back</Text>
       <Text style={styles.subtitle}>Sign in to your Dermato account</Text>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <FormError message={error} /> : null}
 
       <Text style={styles.label}>Mobile number or email</Text>
       <View style={styles.inputWrapper}>
@@ -121,7 +122,6 @@ const styles = StyleSheet.create({
   toggleButton: { position: 'absolute', right: 10, padding: 4 },
   button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
   forgotLink: { marginTop: 14 },
   forgotLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.teal, fontWeight: '600' },
   registerLink: { marginTop: 20 },

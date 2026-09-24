@@ -3,7 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl } 
 import { useNavigation, useFocusEffect, CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Bell, User as UserIcon } from 'lucide-react-native';
+import { Bell, User as UserIcon, ClipboardList } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
@@ -19,6 +19,7 @@ import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { computeTreatmentProgress } from '../utils/treatmentProgress';
 import { CONDITION_LABELS, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
+import EmptyState from '../components/EmptyState';
 
 type TabParamList = { Home: undefined; Analyze: undefined; History: undefined; Progress: undefined };
 // Notifications/Profile/Appointments live in the root Stack (siblings of
@@ -257,7 +258,7 @@ export default function HomeScreen() {
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Active Treatments</Text>
             {activePlans.length === 0 ? (
-              <Text style={styles.emptyText}>No active treatment plans right now.</Text>
+              <EmptyState icon={ClipboardList} title="No active treatments" />
             ) : (
               activePlans.map((p) => {
                 const recheck = recheckLabel(p.expected_recheck_at);
@@ -305,7 +306,7 @@ export default function HomeScreen() {
               )}
             </View>
             {notifications.length === 0 ? (
-              <Text style={styles.emptyText}>Nothing new — you're all caught up.</Text>
+              <EmptyState icon={Bell} title="You're all caught up" description="No new updates right now." />
             ) : (
               notifications.slice(0, 3).map((n) => (
                 <View key={n.id} style={styles.updateRow}>
@@ -376,7 +377,6 @@ const styles = StyleSheet.create({
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
   seeAllLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
-  emptyText: { fontSize: 13, color: COLORS.mutedGray },
   manageProfileRow: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginBottom: 20 },
   manageProfileText: { color: COLORS.secondaryText, fontWeight: '600', fontSize: 14 },
   treatmentRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderTopWidth: 1, borderTopColor: COLORS.border },

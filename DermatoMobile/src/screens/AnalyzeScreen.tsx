@@ -7,6 +7,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
+import FormError from '../components/FormError';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
 type Angle = 'front' | 'left' | 'right';
@@ -213,7 +214,7 @@ export default function AnalyzeScreen() {
         </TouchableOpacity>
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <FormError message={error} /> : null}
 
       <TouchableOpacity
         style={[
@@ -264,5 +265,4 @@ const styles = StyleSheet.create({
   button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  error: { color: '#dc2626', backgroundColor: '#fef2f2', padding: 10, borderRadius: 8, marginBottom: 12, fontSize: 13 },
 });

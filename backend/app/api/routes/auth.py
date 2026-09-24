@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import settings
@@ -25,8 +25,10 @@ from app.schemas import (
     UserCreate,
     UserOut,
     UserUpdate,
+    WorkingHoursUpdate,
 )
 from app.services.mailer import send_password_reset_email
+from app.services.uploads import save_upload, validate_image
 
 router = APIRouter()
 
@@ -140,10 +142,47 @@ def update_me(payload: UserUpdate, db=Depends(get_db), current_user=Depends(get_
         updates["email"] = payload.email
     if payload.full_name is not None:
         updates["full_name"] = payload.full_name
+    if payload.bio is not None:
+        updates["bio"] = payload.bio
+    if payload.specialization is not None:
+        updates["specialization"] = payload.specialization
+    if payload.credentials is not None:
+        updates["credentials"] = payload.credentials
 
     if updates:
         db.users.update_one({"_id": current_user.id}, {"$set": updates})
 
+    return to_ns(db.users.find_one({"_id": current_user.id}))
+
+
+@router.post("/me/avatar", response_model=UserOut)
+async def upload_avatar(file: UploadFile = File(...), db=Depends(get_db), current_user=Depends(get_current_user)):
+    contents = await validate_image(file)
+    filename = save_upload(contents, file.filename)
+    db.users.update_one({"_id": current_user.id}, {"$set": {"avatar_filename": filename}})
+    return to_ns(db.users.find_one({"_id": current_user.id}))
+
+
+_WEEKDAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+
+
+@router.patch("/me/working-hours", response_model=UserOut)
+def update_working_hours(payload: WorkingHoursUpdate, db=Depends(get_db), current_user=Depends(get_current_user)):
+    """Dermatologist-only -- these hours drive the patient-facing available-
+    slots picker (GET /appointments/doctors/{id}/available-slots)."""
+    if current_user.role != "dermatologist":
+        raise HTTPException(status_code=403, detail="Only dermatologists can set working hours")
+
+    for day, window in payload.working_hours.items():
+        if day not in _WEEKDAYS:
+            raise HTTPException(status_code=400, detail=f"Unknown day '{day}', expected one of {sorted(_WEEKDAYS)}")
+        try:
+            datetime.strptime(window["start"], "%H:%M")
+            datetime.strptime(window["end"], "%H:%M")
+        except (KeyError, ValueError):
+            raise HTTPException(status_code=400, detail=f"Invalid time window for '{day}', expected HH:MM")
+
+    db.users.update_one({"_id": current_user.id}, {"$set": {"working_hours": payload.working_hours}})
     return to_ns(db.users.find_one({"_id": current_user.id}))
 
 

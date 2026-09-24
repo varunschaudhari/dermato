@@ -17,9 +17,20 @@ export const SEVERITY_META: Record<string, { color: string; bg: string; label: s
 // future rebrand or dark-mode pass touches one file instead of nine.
 export const COLORS = {
   teal: '#0d9488',
+  tealSoft: '#f0fdfa',
   mutedGray: '#9ca3af',
   heading: '#111827',
   border: '#f3f4f6',
   secondaryText: '#6b7280',
   divider: '#e5e7eb',
+  danger: '#dc2626',
+  dangerSoft: '#fef2f2',
+  success: '#059669',
 };
+
+// Same rationale as COLORS above -- a small shared scale so new screens (and
+// the shared components in src/components/) don't each invent their own
+// spacing/radius numbers, without rewriting every existing screen's
+// already-working StyleSheet.
+export const SPACING = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 };
+export const RADIUS = { sm: 8, md: 12, lg: 14, xl: 20, pill: 999 };
