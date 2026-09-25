@@ -42,7 +42,19 @@ const DELTA_META = {
 const SEVERITY_BAR_COLOR = { mild: 'bg-green-500', moderate: 'bg-amber-500', severe: 'bg-red-500' }
 const SEVERITY_BAR_PCT = { mild: 33, moderate: 66, severe: 100 }
 
-function SeverityBar({ condition, level }) {
+// "mild" is the floor of the 3-tier severity scale (there's no "clear" tier
+// server-side — see severity_classifier.py's _decide), so a genuinely
+// flawless reading (wsi exactly 0: nothing detected in any of the weighted
+// signals) still comes back as "mild", which reads as "you have a mild
+// condition" rather than "nothing found". This relabels that one case for
+// display only — the stored severity, the remedy recommended, and the score
+// (already 100/Excellent for any "mild") are all unchanged. wsi is null for
+// pore (no WSI system there yet), so pore's "mild" label is untouched.
+function severityLabel(level, wsi) {
+  return level === 'mild' && wsi === 0 ? 'Clear' : level
+}
+
+function SeverityBar({ condition, level, wsi }) {
   return (
     <div className="flex items-center gap-3">
       <span className="w-28 shrink-0 text-sm text-gray-700 dark:text-gray-300 capitalize">{condition}</span>
@@ -53,7 +65,7 @@ function SeverityBar({ condition, level }) {
         />
       </div>
       <Badge color={SEVERITY[level]?.color} icon={SEVERITY[level]?.icon} className="shrink-0">
-        {level}
+        {severityLabel(level, wsi)}
       </Badge>
     </div>
   )
@@ -533,7 +545,7 @@ export default function ResultsPage() {
           return (
             <Card key={condition} className="text-center p-4">
               <p className="text-sm text-gray-500 dark:text-gray-400 capitalize mb-2">{condition}</p>
-              <Badge color={s.color} icon={s.icon}>{level}</Badge>
+              <Badge color={s.color} icon={s.icon}>{severityLabel(level, wsi[condition])}</Badge>
               {!isPatient && wsi[condition] != null && (
                 <p className="text-[11px] font-mono tabular-nums text-gray-400 dark:text-gray-500 mt-1">WSI {wsi[condition].toFixed(2)}</p>
               )}
@@ -558,7 +570,7 @@ export default function ResultsPage() {
         <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Severity Overview</h2>
         <div className="space-y-3">
           {Object.entries(severityToShow).map(([condition, level]) => (
-            <SeverityBar key={condition} condition={condition} level={level} />
+            <SeverityBar key={condition} condition={condition} level={level} wsi={wsi[condition]} />
           ))}
         </div>
       </Card>

@@ -80,7 +80,18 @@ const DELTA_META: Record<string, { color: string; icon: typeof ArrowUpRight; lab
 
 const SEVERITY_BAR_PCT: Record<string, number> = { mild: 33, moderate: 66, severe: 100 };
 
-function SeverityBar({ condition, level }: { condition: string; level: string }) {
+// "mild" is the floor of the 3-tier severity scale (there's no "clear" tier
+// server-side — see severity_classifier.py's _decide), so a genuinely
+// flawless reading (wsi exactly 0: nothing detected in any of the weighted
+// signals) still comes back as "mild", which reads as "you have a mild
+// condition" rather than "nothing found". This relabels that one case for
+// display only. wsi is null for pore (no WSI system there yet), so pore's
+// "mild" label is untouched. Mirrors web's ResultsPage.jsx severityLabel.
+function severityLabel(level: string, wsi: number | null | undefined): string {
+  return level === 'mild' && wsi === 0 ? 'Clear' : (SEVERITY_META[level] ?? SEVERITY_META.mild).label;
+}
+
+function SeverityBar({ condition, level, wsi }: { condition: string; level: string; wsi?: number | null }) {
   const meta = SEVERITY_META[level] ?? SEVERITY_META.mild;
   return (
     <View style={styles.severityBarRow}>
@@ -94,7 +105,7 @@ function SeverityBar({ condition, level }: { condition: string; level: string })
         />
       </View>
       <View style={[styles.severityPill, { backgroundColor: meta.bg }]}>
-        <Text style={[styles.severityPillText, { color: meta.color }]}>{meta.label}</Text>
+        <Text style={[styles.severityPillText, { color: meta.color }]}>{severityLabel(level, wsi)}</Text>
       </View>
     </View>
   );
@@ -260,6 +271,7 @@ export default function ResultsScreen() {
   const {
     severity, recommendations, model_powered: modelPowered, ml_detections: mlDetections,
     previous_severity: previousSeverity = {}, flags = {}, overlays = {}, image_url: imageUrl, patient_id: patientId,
+    wsi = {},
   } = result;
   const detections = mlDetections?.detections ?? [];
 
@@ -558,7 +570,9 @@ export default function ResultsScreen() {
             <View key={condition} style={styles.severityCard}>
               <Text style={styles.cardLabel}>{CONDITION_LABELS[condition] ?? condition}</Text>
               <View style={[styles.severityPill, { backgroundColor: meta.bg }]}>
-                <Text style={[styles.severityPillText, { color: meta.color }]}>{meta.label}</Text>
+                <Text style={[styles.severityPillText, { color: meta.color }]}>
+                  {severityLabel(level as string, (wsi as Record<string, number | null>)[condition])}
+                </Text>
               </View>
               {delta && (
                 <View style={styles.deltaRow}>
@@ -577,7 +591,12 @@ export default function ResultsScreen() {
           <Text style={styles.cardTitle}>Severity Overview</Text>
           <View style={{ marginTop: 10, gap: 12 }}>
             {Object.entries(severityToShow).map(([condition, level]) => (
-              <SeverityBar key={condition} condition={condition} level={level as string} />
+              <SeverityBar
+                key={condition}
+                condition={condition}
+                level={level as string}
+                wsi={(wsi as Record<string, number | null>)[condition]}
+              />
             ))}
           </View>
         </View>
