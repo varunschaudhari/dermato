@@ -91,6 +91,8 @@ export default function RegisterScreen() {
           <TextInput
             style={[styles.input, styles.inputWithToggle]}
             secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
             value={form.password}
             onChangeText={(v) => setForm({ ...form, password: v })}
             placeholder="At least 8 characters"

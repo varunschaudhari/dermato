@@ -283,9 +283,23 @@ export default function ProfileScreen() {
         <Text style={styles.cardTitle}>Change password</Text>
         {passwordError ? <FormError message={passwordError} /> : null}
         <Text style={styles.fieldLabel}>Current password</Text>
-        <TextInput style={styles.input} value={currentPassword} onChangeText={setCurrentPassword} secureTextEntry />
+        <TextInput
+          style={styles.input}
+          value={currentPassword}
+          onChangeText={setCurrentPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         <Text style={styles.fieldLabel}>New password</Text>
-        <TextInput style={styles.input} value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+        <TextInput
+          style={styles.input}
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
         <TouchableOpacity
           style={styles.saveButton}
           onPress={handleChangePassword}

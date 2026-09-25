@@ -61,6 +61,8 @@ export default function LoginScreen() {
         <TextInput
           style={[styles.input, styles.inputWithToggle]}
           secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          autoCorrect={false}
           value={password}
           onChangeText={setPassword}
           placeholder="••••••••"
