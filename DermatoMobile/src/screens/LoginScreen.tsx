@@ -76,9 +76,9 @@ export default function LoginScreen() {
       </View>
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, (!phone.trim() || !password || loading) && styles.buttonDisabled]}
         onPress={handleSubmit}
-        disabled={loading}
+        disabled={!phone.trim() || !password || loading}
         accessibilityRole="button"
         accessibilityLabel="Sign in"
       >
@@ -121,6 +121,7 @@ const styles = StyleSheet.create({
   inputWithToggle: { paddingRight: 40 },
   toggleButton: { position: 'absolute', right: 10, padding: 4 },
   button: { backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 13, alignItems: 'center', marginTop: 8 },
+  buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '600', fontSize: 15 },
   forgotLink: { marginTop: 14 },
   forgotLinkText: { textAlign: 'center', fontSize: 13, color: COLORS.teal, fontWeight: '600' },
