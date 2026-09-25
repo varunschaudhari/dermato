@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useLocation, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
-import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2, CheckSquare, Square } from 'lucide-react'
+import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2, CheckSquare, Square, Search } from 'lucide-react'
 import {
   getPatient,
   getPatientSessions,
@@ -608,6 +608,22 @@ export default function ProgressPage() {
     setCompareRightIdx(null)
   }, [patientId])
 
+  const [historySearch, setHistorySearch] = useState('')
+  const filteredHistorySessions = useMemo(() => {
+    const reversed = [...sessions].reverse()
+    const q = historySearch.trim().toLowerCase()
+    if (!q) return reversed
+    return reversed.filter((s) => {
+      const dateStr = new Date(s.captured_at).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }).toLowerCase()
+      if (dateStr.includes(q)) return true
+      if ((s.doctor_note || '').toLowerCase().includes(q)) return true
+      return Object.keys(CONDITION_LABELS).some((key) => {
+        const level = s[`${key}_severity`]
+        return level && (level.toLowerCase().includes(q) || CONDITION_LABELS[key].toLowerCase().includes(q))
+      })
+    })
+  }, [sessions, historySearch])
+
   useEffect(() => {
     if (!location.hash) return
     const id = location.hash.slice(1)
@@ -850,12 +866,27 @@ export default function ProgressPage() {
                 </Card>
 
                 <Card>
-                  <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
-                    <MessageSquare className="w-5 h-5 text-brand-600" />
-                    Session History
-                  </h2>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                      <MessageSquare className="w-5 h-5 text-brand-600" />
+                      Session History
+                    </h2>
+                    <div className="relative w-full sm:w-64">
+                      <Search className="w-4 h-4 text-gray-400 dark:text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                        placeholder="Search by date, condition, note…"
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl focus:border-brand-500"
+                      />
+                    </div>
+                  </div>
+                  {filteredHistorySessions.length === 0 ? (
+                    <EmptyState icon={Search} title="No sessions match your search" description="Try a different date, condition, or word from a note." />
+                  ) : (
                   <div className="space-y-4">
-                    {[...sessions].reverse().map((s) => (
+                    {filteredHistorySessions.map((s) => (
                       <div key={s.id} className="border border-gray-100 dark:border-gray-800 rounded-xl p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                           <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -912,6 +943,7 @@ export default function ProgressPage() {
                       </div>
                     ))}
                   </div>
+                  )}
                 </Card>
               </>
             )

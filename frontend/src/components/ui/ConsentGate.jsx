@@ -46,6 +46,12 @@ export default function ConsentGate() {
             to request that your account and data be deleted.
           </p>
         </div>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-3 text-center">
+          By continuing, you agree to our{' '}
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline">Terms of Service</a>
+          {' '}and{' '}
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline">Privacy Policy</a>.
+        </p>
         <Button onClick={handleAccept} disabled={loading} fullWidth>
           {loading ? 'Saving...' : 'I Understand and Agree'}
         </Button>

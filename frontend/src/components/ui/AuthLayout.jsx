@@ -19,6 +19,11 @@ export default function AuthLayout({ title, subtitle, children }) {
           {subtitle && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5 text-center">{subtitle}</p>}
         </div>
         {children}
+        <p className="mt-6 text-center text-xs text-gray-400 dark:text-gray-500">
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300">Privacy</a>
+          {' · '}
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="hover:text-gray-600 dark:hover:text-gray-300">Terms</a>
+        </p>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -311,6 +311,26 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>About &amp; legal</Text>
+        <TouchableOpacity
+          style={styles.legalRow}
+          onPress={() => Linking.openURL('https://dermato.cloud/privacy.html')}
+          accessibilityRole="link"
+          accessibilityLabel="Privacy Policy"
+        >
+          <Text style={styles.legalLink}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.legalRow}
+          onPress={() => Linking.openURL('https://dermato.cloud/terms.html')}
+          accessibilityRole="link"
+          accessibilityLabel="Terms of Service"
+        >
+          <Text style={styles.legalLink}>Terms of Service</Text>
+        </TouchableOpacity>
+      </View>
+
       <TouchableOpacity style={styles.logoutButton} onPress={logout} accessibilityRole="button" accessibilityLabel="Log out">
         <Text style={styles.logoutButtonText}>Log out</Text>
       </TouchableOpacity>
@@ -364,4 +384,6 @@ const styles = StyleSheet.create({
   },
   dayTimeSep: { fontSize: 11, color: COLORS.mutedGray },
   dayUnavailable: { fontSize: 12, color: COLORS.mutedGray },
+  legalRow: { paddingVertical: 8 },
+  legalLink: { color: COLORS.teal, fontWeight: '600', fontSize: 14 },
 });

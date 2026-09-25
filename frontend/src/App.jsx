@@ -1,30 +1,32 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Sidebar from './components/ui/Sidebar'
 import TopBar from './components/ui/TopBar'
 import BottomNav from './components/ui/BottomNav'
 import ProtectedRoute from './components/ui/ProtectedRoute'
 import ConsentGate from './components/ui/ConsentGate'
-import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
-import PatientRegisterPage from './pages/PatientRegisterPage'
-import ForgotPasswordPage from './pages/ForgotPasswordPage'
-import ResetPasswordPage from './pages/ResetPasswordPage'
-import AnalyzePage from './pages/AnalyzePage'
-import ResultsPage from './pages/ResultsPage'
-import PatientsPage from './pages/PatientsPage'
-import ProgressPage from './pages/ProgressPage'
-import AdminUsersPage from './pages/AdminUsersPage'
-import AdminContentPage from './pages/AdminContentPage'
-import DashboardPage from './pages/DashboardPage'
-import DoctorWorklistPage from './pages/DoctorWorklistPage'
-import ReportPage from './pages/ReportPage'
-import PatientChartPage from './pages/PatientChartPage'
-import ProfilePage from './pages/ProfilePage'
-import AppointmentsPage from './pages/AppointmentsPage'
-import MessagesInboxPage from './pages/MessagesInboxPage'
-import NotificationsPage from './pages/NotificationsPage'
-import ReportsPage from './pages/ReportsPage'
-import PatientHomePage from './pages/PatientHomePage'
+
+const LoginPage = lazy(() => import('./pages/LoginPage'))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+const PatientRegisterPage = lazy(() => import('./pages/PatientRegisterPage'))
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'))
+const ResetPasswordPage = lazy(() => import('./pages/ResetPasswordPage'))
+const AnalyzePage = lazy(() => import('./pages/AnalyzePage'))
+const ResultsPage = lazy(() => import('./pages/ResultsPage'))
+const PatientsPage = lazy(() => import('./pages/PatientsPage'))
+const ProgressPage = lazy(() => import('./pages/ProgressPage'))
+const AdminUsersPage = lazy(() => import('./pages/AdminUsersPage'))
+const AdminContentPage = lazy(() => import('./pages/AdminContentPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const DoctorWorklistPage = lazy(() => import('./pages/DoctorWorklistPage'))
+const ReportPage = lazy(() => import('./pages/ReportPage'))
+const PatientChartPage = lazy(() => import('./pages/PatientChartPage'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const AppointmentsPage = lazy(() => import('./pages/AppointmentsPage'))
+const MessagesInboxPage = lazy(() => import('./pages/MessagesInboxPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const ReportsPage = lazy(() => import('./pages/ReportsPage'))
+const PatientHomePage = lazy(() => import('./pages/PatientHomePage'))
 
 export default function App() {
   const { pathname } = useLocation()
@@ -38,6 +40,13 @@ export default function App() {
         <main className="flex-1 px-4 py-6 sm:py-8 pb-24 md:pb-8">
           <div className="max-w-5xl mx-auto w-full">
             <div key={pathname} className="animate-fade-in">
+              <Suspense
+                fallback={
+                  <div className="min-h-[50vh] flex items-center justify-center">
+                    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                }
+              >
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/register" element={<RegisterPage />} />
@@ -166,6 +175,7 @@ export default function App() {
                   }
                 />
               </Routes>
+              </Suspense>
             </div>
           </div>
         </main>

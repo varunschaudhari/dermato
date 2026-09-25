@@ -302,6 +302,14 @@ export default function ProfilePage() {
           </Button>
         </form>
       </Card>
+
+      <Card>
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">About &amp; legal</h2>
+        <div className="flex items-center gap-4 text-sm">
+          <a href="/privacy.html" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline">Privacy Policy</a>
+          <a href="/terms.html" target="_blank" rel="noopener noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline">Terms of Service</a>
+        </div>
+      </Card>
     </div>
   )
 }

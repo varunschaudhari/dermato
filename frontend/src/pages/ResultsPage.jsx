@@ -154,6 +154,43 @@ function AboutConditionCard({ condition, info }) {
   )
 }
 
+function SeverityGuideCard() {
+  const [open, setOpen] = useState(false)
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className="font-medium text-gray-900 dark:text-gray-100">What do these severity levels mean?</h3>
+        {open ? <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3 text-sm text-gray-600 dark:text-gray-400">
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Mild</p>
+            <p>A home skincare routine is typically enough to manage this.</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Moderate</p>
+            <p>An over-the-counter (OTC) treatment is typically recommended alongside your home routine.</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Severe</p>
+            <p>Worth seeing a dermatologist in person rather than self-treating.</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Escalated</p>
+            <p>Previous remedies for this condition haven't helped, so the recommendation was bumped up a tier instead of repeating what didn't work.</p>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
 // Surfaces the recheck date(s) treatment_tracker.py already computed for the
 // plan(s) this exact analysis just created — at the moment of highest
 // attention, right after the result, rather than only discoverable later on
@@ -574,6 +611,8 @@ export default function ResultsPage() {
           ))}
         </div>
       </Card>
+
+      <SeverityGuideCard />
 
       {/* AI detections */}
       {mlDetections && (

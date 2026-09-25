@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Share } from 'react-native';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react-native';
+import { ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, Share2, ChevronDown, ChevronUp } from 'lucide-react-native';
 import { absoluteUrl, getSession, getTreatmentPlans, SessionOut, TreatmentPlanOut } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
@@ -16,6 +16,45 @@ const OUTCOME_META: Record<string, { color: string; icon: any; label: string }> 
 };
 
 const CONDITIONS = Object.keys(CONDITION_LABELS);
+
+function SeverityGuideCard() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        onPress={() => setOpen((v) => !v)}
+        style={styles.aboutHeaderRow}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel="What do these severity levels mean?"
+      >
+        <Text style={styles.cardTitle}>What do these severity levels mean?</Text>
+        {open ? <ChevronUp size={18} color={COLORS.mutedGray} /> : <ChevronDown size={18} color={COLORS.mutedGray} />}
+      </TouchableOpacity>
+      {open && (
+        <View style={{ marginTop: 10, gap: 10 }}>
+          <View>
+            <Text style={styles.aboutLabel}>Mild</Text>
+            <Text style={styles.aboutText}>A home skincare routine is typically enough to manage this.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Moderate</Text>
+            <Text style={styles.aboutText}>An over-the-counter (OTC) treatment is typically recommended alongside your home routine.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Severe</Text>
+            <Text style={styles.aboutText}>Worth seeing a dermatologist in person rather than self-treating.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Escalated</Text>
+            <Text style={styles.aboutText}>Previous remedies for this condition haven't helped, so the recommendation was bumped up a tier instead of repeating what didn't work.</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
 
 export default function ReportScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Report'>>();
@@ -89,6 +128,8 @@ export default function ReportScreen() {
           );
         })}
       </View>
+
+      <SeverityGuideCard />
 
       {conditions.some((c) => recommendations[c]) && (
         <>
@@ -164,6 +205,23 @@ export default function ReportScreen() {
           {recommendations.disclaimer || 'For informational use only. Please consult a dermatologist for medical advice.'}
         </Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.shareButton}
+        onPress={() => {
+          const dateStr = new Date(session.captured_at).toLocaleDateString();
+          const lines = conditions.map((c) => `${CONDITION_LABELS[c]}: ${(session as any)[`${c}_severity`]}`);
+          const message =
+            `My Dermato skin analysis report — ${dateStr}\n${lines.join(', ')}` +
+            (session.doctor_note ? `\n\nDoctor's note: ${session.doctor_note}` : '');
+          Share.share({ message }).catch(() => {});
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Share Report"
+      >
+        <Share2 size={15} color={COLORS.teal} />
+        <Text style={styles.shareButtonText}>Share Report</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -176,6 +234,10 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 16 },
   image: { width: '100%', height: 260, borderRadius: 14, backgroundColor: COLORS.divider, marginBottom: 20 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading, marginBottom: 10, marginTop: 4 },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.heading },
+  aboutHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  aboutLabel: { fontSize: 10, fontWeight: '700', color: COLORS.mutedGray, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  aboutText: { fontSize: 13, color: '#4b5563', lineHeight: 18 },
   severityGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
   severityCard: {
     width: '47%',
@@ -207,4 +269,16 @@ const styles = StyleSheet.create({
   footer: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 14, marginBottom: 30, gap: 4 },
   footerText: { fontSize: 11, fontWeight: '600', color: COLORS.mutedGray },
   footerDisclaimer: { fontSize: 11, color: COLORS.mutedGray, fontStyle: 'italic' },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginBottom: 30,
+  },
+  shareButtonText: { color: COLORS.teal, fontWeight: '600', fontSize: 13 },
 });

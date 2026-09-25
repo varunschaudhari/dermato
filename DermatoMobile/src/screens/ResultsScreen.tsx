@@ -264,6 +264,45 @@ function AboutConditionCard({ condition, info }: { condition: string; info: Cond
   );
 }
 
+function SeverityGuideCard() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        onPress={() => setOpen((v) => !v)}
+        style={styles.aboutHeaderRow}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel="What do these severity levels mean?"
+      >
+        <Text style={styles.cardTitle}>What do these severity levels mean?</Text>
+        {open ? <ChevronUp size={18} color={COLORS.mutedGray} /> : <ChevronDown size={18} color={COLORS.mutedGray} />}
+      </TouchableOpacity>
+      {open && (
+        <View style={{ marginTop: 10, gap: 10 }}>
+          <View>
+            <Text style={styles.aboutLabel}>Mild</Text>
+            <Text style={styles.aboutText}>A home skincare routine is typically enough to manage this.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Moderate</Text>
+            <Text style={styles.aboutText}>An over-the-counter (OTC) treatment is typically recommended alongside your home routine.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Severe</Text>
+            <Text style={styles.aboutText}>Worth seeing a dermatologist in person rather than self-treating.</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Escalated</Text>
+            <Text style={styles.aboutText}>Previous remedies for this condition haven't helped, so the recommendation was bumped up a tier instead of repeating what didn't work.</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -601,6 +640,8 @@ export default function ResultsScreen() {
           </View>
         </View>
       )}
+
+      <SeverityGuideCard />
 
       {mlDetections && (
         <View style={styles.card}>
