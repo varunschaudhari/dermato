@@ -50,10 +50,15 @@ def _sync_overdue_recheck_notifications(db, current_user) -> None:
 
 
 @router.get("/", response_model=list[NotificationOut])
-def list_notifications(limit: int = 30, db=Depends(get_db), current_user=Depends(get_current_user)):
+def list_notifications(
+    limit: int = 30, skip: int = 0, db=Depends(get_db), current_user=Depends(get_current_user)
+):
     _sync_overdue_recheck_notifications(db, current_user)
     notifications = (
-        db.notifications.find({"user_id": current_user.id}).sort("created_at", -1).limit(min(limit, 200))
+        db.notifications.find({"user_id": current_user.id})
+        .sort("created_at", -1)
+        .skip(max(skip, 0))
+        .limit(min(limit, 200))
     )
     return [to_ns(n) for n in notifications]
 

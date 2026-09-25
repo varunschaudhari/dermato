@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Save, FileEdit } from 'lucide-react'
-import { getRemedies, updateRemedy } from '../services/api'
+import { Save, FileEdit, GraduationCap } from 'lucide-react'
+import { getRemedies, updateRemedy, getConditionEducation, updateConditionEducation } from '../services/api'
 import { useToast } from '../context/ToastContext'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
@@ -93,6 +93,73 @@ function RemedyRow({ condition, severity, remedy, onSave, saving }) {
   )
 }
 
+function EducationCard({ condition, education, onSave, saving }) {
+  const [causes, setCauses] = useState(education?.causes || '')
+  const [whatToExpect, setWhatToExpect] = useState(education?.what_to_expect || '')
+  const [timeline, setTimeline] = useState(education?.timeline || '')
+  const [severeGuidance, setSevereGuidance] = useState(education?.severe_guidance || '')
+
+  const handleSave = () => {
+    onSave(condition, {
+      causes: causes.trim(),
+      what_to_expect: whatToExpect.trim(),
+      timeline: timeline.trim(),
+      severe_guidance: severeGuidance.trim(),
+    })
+  }
+
+  return (
+    <Card>
+      <h2 className="font-semibold text-gray-900 dark:text-gray-100 mb-3">{CONDITION_LABELS[condition] || condition}</h2>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Causes</label>
+          <textarea
+            rows={3}
+            value={causes}
+            onChange={(e) => setCauses(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">What to expect</label>
+          <textarea
+            rows={3}
+            value={whatToExpect}
+            onChange={(e) => setWhatToExpect(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">Timeline</label>
+          <textarea
+            rows={3}
+            value={timeline}
+            onChange={(e) => setTimeline(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-gray-600 dark:text-gray-400 mb-1">
+            Severe-severity guidance (shown as an urgent banner to the patient)
+          </label>
+          <textarea
+            rows={3}
+            value={severeGuidance}
+            onChange={(e) => setSevereGuidance(e.target.value)}
+            className="w-full border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-xl px-3 py-2.5 text-sm focus:border-brand-500"
+          />
+        </div>
+      </div>
+      <div className="mt-3">
+        <Button onClick={handleSave} size="sm" icon={Save} disabled={saving}>
+          Save
+        </Button>
+      </div>
+    </Card>
+  )
+}
+
 export default function AdminContentPage() {
   const qc = useQueryClient()
   const toast = useToast()
@@ -113,6 +180,24 @@ export default function AdminContentPage() {
 
   const handleSave = (condition, severity, data) => {
     updateMutation.mutate({ condition, severity, data })
+  }
+
+  const { data: education = [], isLoading: educationLoading, isError: educationError, refetch: refetchEducation } = useQuery({
+    queryKey: ['condition-education'],
+    queryFn: () => getConditionEducation().then((r) => r.data),
+  })
+
+  const updateEducationMutation = useMutation({
+    mutationFn: ({ condition, data }) => updateConditionEducation(condition, data),
+    onSuccess: (_, variables) => {
+      qc.invalidateQueries(['condition-education'])
+      toast.success(`Updated ${CONDITION_LABELS[variables.condition] || variables.condition} education content.`)
+    },
+    onError: () => toast.error('Could not save this content.'),
+  })
+
+  const handleSaveEducation = (condition, data) => {
+    updateEducationMutation.mutate({ condition, data })
   }
 
   return (
@@ -149,6 +234,33 @@ export default function AdminContentPage() {
           ))}
         </div>
       )}
+
+      <div>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2 mb-4">
+          <GraduationCap className="w-5 h-5 text-brand-600" />
+          Condition education
+        </h2>
+        {educationLoading ? (
+          <div className="space-y-4">
+            <SkeletonCard lines={4} />
+            <SkeletonCard lines={4} />
+          </div>
+        ) : educationError ? (
+          <QueryError message="Couldn't load education content." onRetry={refetchEducation} />
+        ) : (
+          <div className="space-y-4">
+            {education.map((doc) => (
+              <EducationCard
+                key={doc._id}
+                condition={doc._id}
+                education={doc}
+                onSave={handleSaveEducation}
+                saving={updateEducationMutation.isPending}
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

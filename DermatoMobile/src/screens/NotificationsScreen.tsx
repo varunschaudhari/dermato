@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, LayoutAnimation } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, LayoutAnimation, ActivityIndicator } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
@@ -26,27 +26,34 @@ function timeAgo(iso: string): string {
   return `${days}d ago`;
 }
 
-// The backend's `link` field points at web routes ("/analyze",
-// "/progress/{id}") — this app only has the logged-in patient's own data, so
-// it just needs to know which tab that corresponds to.
+// The backend's `link` field points at web routes ("/", "/progress/{id}") —
+// this app only has the logged-in patient's own data, so it just needs to
+// know which tab that corresponds to. "/" is the web Analyze page (its root
+// route, not "/analyze" — there is no such route) and is what recheck_due
+// and checkin_reminder both link to for "come scan again".
 function tabForLink(link: string | null | undefined): string | null {
   if (!link) return null;
-  if (link.startsWith('/analyze')) return 'Analyze';
+  if (link === '/' || link.startsWith('/analyze')) return 'Analyze';
   if (link.startsWith('/progress')) return 'Progress';
   return null;
 }
+
+const PAGE_SIZE = 30;
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [notifications, setNotifications] = useState<NotificationOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await getNotifications();
+      const { data } = await getNotifications(PAGE_SIZE, 0);
       setNotifications(data);
+      setHasMore(data.length === PAGE_SIZE);
       setError('');
     } catch {
       setError("Couldn't load your notifications.");
@@ -56,6 +63,20 @@ export default function NotificationsScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const { data } = await getNotifications(PAGE_SIZE, notifications.length);
+      setNotifications((prev) => [...prev, ...data]);
+      setHasMore(data.length === PAGE_SIZE);
+    } catch {
+      // Leave hasMore as-is -- a failed "load more" just means the button stays put to retry.
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
@@ -102,6 +123,19 @@ export default function NotificationsScreen() {
           refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
           ListEmptyComponent={
             !loading ? <EmptyState icon={Bell} title="You're all caught up" description="No notifications yet." /> : undefined
+          }
+          ListFooterComponent={
+            hasMore ? (
+              <TouchableOpacity
+                style={styles.loadMoreButton}
+                onPress={loadMore}
+                disabled={loadingMore}
+                accessibilityRole="button"
+                accessibilityLabel="Load more notifications"
+              >
+                {loadingMore ? <ActivityIndicator size="small" color={COLORS.teal} /> : <Text style={styles.loadMoreText}>Load more</Text>}
+              </TouchableOpacity>
+            ) : undefined
           }
           renderItem={({ item }) => (
             <TouchableOpacity
@@ -150,4 +184,14 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.teal, marginTop: 5 },
   message: { fontSize: 13, color: '#374151', lineHeight: 18 },
   time: { fontSize: 11, color: COLORS.mutedGray, marginTop: 4 },
+  loadMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  loadMoreText: { color: COLORS.teal, fontWeight: '600', fontSize: 13 },
 });

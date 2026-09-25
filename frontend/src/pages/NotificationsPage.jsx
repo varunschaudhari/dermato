@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Bell, CheckCheck } from 'lucide-react'
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../services/api'
 import { timeAgo } from '../utils/timeAgo'
@@ -10,14 +10,28 @@ import EmptyState from '../components/ui/EmptyState'
 import { SkeletonCard } from '../components/ui/Skeleton'
 import QueryError from '../components/ui/QueryError'
 
+const PAGE_SIZE = 30
+
 export default function NotificationsPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
 
-  const { data: notifications = [], isLoading, isError, refetch } = useQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: ['notifications', 'full'],
-    queryFn: () => getNotifications(200).then((r) => r.data),
+    queryFn: ({ pageParam }) => getNotifications(PAGE_SIZE, pageParam).then((r) => r.data),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PAGE_SIZE ? allPages.flat().length : undefined,
   })
+  const notifications = data?.pages.flat() ?? []
 
   const readMutation = useMutation({
     mutationFn: (id) => markNotificationRead(id),
@@ -89,6 +103,13 @@ export default function NotificationsPage() {
               <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{timeAgo(n.created_at)}</span>
             </Card>
           ))}
+          {hasNextPage && (
+            <div className="flex justify-center pt-2">
+              <Button variant="outline" size="sm" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                {isFetchingNextPage ? 'Loading...' : 'Load more'}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>

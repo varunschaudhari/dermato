@@ -2,8 +2,19 @@ import { useState, useEffect } from 'react'
 import { useParams, useLocation, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
-import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2 } from 'lucide-react'
-import { getPatient, getPatientSessions, getTreatmentPlans, updateDoctorNote, updateTreatmentAdherence, updateSkinHistory, exportPatientData, deletePatient } from '../services/api'
+import { TrendingUp, History, Images, Inbox, FileText, MessageSquarePlus, MessageSquare, ClipboardList, ArrowDownRight, ArrowUpRight, ArrowRight, Minus, Download, Trash2, FileStack, Gauge, GalleryHorizontal, Share2, CheckSquare, Square } from 'lucide-react'
+import {
+  getPatient,
+  getPatientSessions,
+  getTreatmentPlans,
+  updateDoctorNote,
+  updateTreatmentAdherence,
+  getTreatmentChecklist,
+  updateTreatmentChecklist,
+  updateSkinHistory,
+  exportPatientData,
+  deletePatient,
+} from '../services/api'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
@@ -63,6 +74,53 @@ function AdherenceCheckIn({ plan, patientId }) {
           No
         </Button>
       </div>
+    </div>
+  )
+}
+
+function RoutineChecklist({ plan, patientId }) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['treatment-checklist', patientId, plan.id],
+    queryFn: () => getTreatmentChecklist(patientId, plan.id).then((r) => r.data),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ index, completed }) => updateTreatmentChecklist(patientId, plan.id, { index, completed }),
+    onSuccess: (res) => qc.setQueryData(['treatment-checklist', patientId, plan.id], res.data),
+  })
+
+  if (isLoading || !data || data.items.length === 0) return null
+
+  return (
+    <div className="mt-2 pt-2 border-t border-white/60 dark:border-black/20">
+      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Today's routine</p>
+      <div className="space-y-1">
+        {data.items.map((item, index) => {
+          const done = data.completed_indices.includes(index)
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => toggleMutation.mutate({ index, completed: !done })}
+              disabled={toggleMutation.isPending}
+              className="flex items-start gap-2 text-left w-full"
+            >
+              {done ? (
+                <CheckSquare className="w-4 h-4 text-brand-600 mt-0.5 shrink-0" />
+              ) : (
+                <Square className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+              )}
+              <span className={`text-xs ${done ? 'text-gray-400 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-300'}`}>
+                {item}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1.5">
+        This checklist resets whenever you get an updated recommendation.
+      </p>
     </div>
   )
 }
@@ -129,6 +187,7 @@ function TreatmentPlans({ plans, patientId, isPatient }) {
                       </span>
                     </div>
                   )}
+                  {isPatient && <RoutineChecklist plan={active} patientId={patientId} />}
                   {isPatient && <AdherenceCheckIn plan={active} patientId={patientId} />}
                 </div>
               )}

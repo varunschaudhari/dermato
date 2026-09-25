@@ -6,7 +6,7 @@ the escalation rule this gate sits on top of."""
 from datetime import datetime
 
 from app.db.database import db, next_id
-from app.services.treatment_tracker import compute_effective_severity
+from app.services.treatment_tracker import checklist_items_for_plan, compute_effective_severity
 
 
 def _resolved_plan(patient_id, condition, outcome, adherence=None):
@@ -72,3 +72,36 @@ def test_one_not_followed_plan_out_of_two_still_blocks_escalation():
     effective, escalated = compute_effective_severity(db, patient_id, "acne", "mild")
     assert escalated is False
     assert effective == "mild"
+
+
+def test_checklist_splits_on_newlines_when_present():
+    plan = {"remedy_type": "OTC Cosmeceutical", "how_to": "Cleanse gently.\nApply serum.\nMoisturize."}
+    assert checklist_items_for_plan(plan) == ["Cleanse gently.", "Apply serum.", "Moisturize."]
+
+
+def test_checklist_falls_back_to_single_item_with_no_newlines():
+    # The real seeded how_to text has no newlines and mixes daily actions
+    # with conditional warnings -- sentence-splitting it would produce wrong
+    # checkboxes, so a single honest item is the only safe fallback.
+    plan = {
+        "remedy_type": "Home remedy",
+        "how_to": "Cleanse gently twice daily. Stop and reassess if you notice redness or irritation.",
+    }
+    assert checklist_items_for_plan(plan) == [
+        "Cleanse gently twice daily. Stop and reassess if you notice redness or irritation."
+    ]
+
+
+def test_checklist_falls_back_to_remedy_text_when_how_to_missing():
+    plan = {"remedy_type": "Home remedy", "how_to": None, "remedy_text": "Tea tree oil, Honey mask"}
+    assert checklist_items_for_plan(plan) == ["Tea tree oil, Honey mask"]
+
+
+def test_checklist_empty_for_referral_plans():
+    plan = {"remedy_type": "Referral", "how_to": "Book a consultation with a dermatologist."}
+    assert checklist_items_for_plan(plan) == []
+
+
+def test_checklist_empty_when_no_text_at_all():
+    plan = {"remedy_type": "Home remedy", "how_to": None, "remedy_text": ""}
+    assert checklist_items_for_plan(plan) == []

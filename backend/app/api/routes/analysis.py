@@ -13,6 +13,7 @@ from app.db.database import get_db, next_id, to_ns
 from app.services import preprocessor, quality_gate, acne_analyzer, pigmentation_analyzer, wrinkle_analyzer, pore_analyzer, face_detector
 from app.services.severity_classifier import classify_acne, classify_pigmentation, classify_wrinkle, classify_pore
 from app.services.recommendation_engine import get_recommendations
+from app.services.condition_education import annotate_patient_guidance
 from app.services.treatment_tracker import compute_effective_severity, update_treatment_plan
 from app.services.notifier import notify_user
 from app.services.uploads import validate_image as _read_and_validate, save_upload as _save_upload
@@ -208,6 +209,7 @@ async def analyze_image(
     # shared state, even if that guarantee changes upstream.
     for condition in detected_severities:
         recommendations[condition] = {**recommendations[condition], "escalated": escalated_flags[condition]}
+    annotate_patient_guidance(db, recommendations, detected_severities)
 
     filename = _save_upload(contents, file.filename)
     image_paths = {"front": filename}

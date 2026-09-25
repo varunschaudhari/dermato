@@ -2,6 +2,7 @@ import csv
 import io
 import os
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from app.core.config import settings
@@ -10,6 +11,7 @@ from app.db.database import get_db, next_id, to_ns
 from app.schemas import (
     AdherenceUpdate,
     AssignDoctorRequest,
+    ChecklistToggle,
     ImportResult,
     MessageCreate,
     MessageInboxItem,
@@ -23,6 +25,7 @@ from app.schemas import (
     UserOut,
 )
 from app.services.notifier import notify_user
+from app.services.treatment_tracker import checklist_items_for_plan
 
 router = APIRouter()
 
@@ -254,6 +257,69 @@ def update_treatment_adherence(
 
     db.treatment_plans.update_one({"_id": plan_id}, {"$set": {"adherence": payload.adherence}})
     return to_ns(db.treatment_plans.find_one({"_id": plan_id}))
+
+
+@router.get("/{patient_id}/treatment-plans/{plan_id}/checklist")
+def get_treatment_checklist(
+    patient_id: int,
+    plan_id: int,
+    date: Optional[str] = None,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Read-only -- works for any plan the patient has (including resolved
+    ones, so a patient can look back at a past day), unlike the PATCH below
+    which is restricted to the active plan like adherence is."""
+    _ensure_patient_access(patient_id, current_user)
+    plan = db.treatment_plans.find_one({"_id": plan_id, "patient_id": patient_id})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Treatment plan not found")
+
+    day = date or datetime.utcnow().strftime("%Y-%m-%d")
+    items = checklist_items_for_plan(plan)
+    checkin = db.routine_checkins.find_one({"plan_id": plan_id, "date": day})
+    return {"date": day, "items": items, "completed_indices": (checkin or {}).get("completed_indices", [])}
+
+
+@router.patch("/{patient_id}/treatment-plans/{plan_id}/checklist")
+def update_treatment_checklist(
+    patient_id: int,
+    plan_id: int,
+    payload: ChecklistToggle,
+    db=Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Self-report only, same restriction as adherence: only the patient
+    themselves, and only while the plan is still active -- a resolved plan's
+    routine is history, not something to keep checking off."""
+    if current_user.role != "patient" or current_user.patient_id != patient_id:
+        raise HTTPException(status_code=403, detail="Not authorized to update this treatment plan")
+
+    plan = db.treatment_plans.find_one({"_id": plan_id, "patient_id": patient_id, "status": "active"})
+    if not plan:
+        raise HTTPException(status_code=404, detail="Active treatment plan not found")
+
+    items = checklist_items_for_plan(plan)
+    if not (0 <= payload.index < len(items)):
+        raise HTTPException(status_code=400, detail="Invalid item index")
+
+    day = payload.date or datetime.utcnow().strftime("%Y-%m-%d")
+    checkin = db.routine_checkins.find_one({"plan_id": plan_id, "date": day})
+    completed = set((checkin or {}).get("completed_indices", []))
+    if payload.completed:
+        completed.add(payload.index)
+    else:
+        completed.discard(payload.index)
+
+    db.routine_checkins.update_one(
+        {"plan_id": plan_id, "date": day},
+        {
+            "$set": {"patient_id": patient_id, "completed_indices": sorted(completed)},
+            "$setOnInsert": {"_id": next_id("routine_checkins"), "created_at": datetime.utcnow()},
+        },
+        upsert=True,
+    )
+    return {"date": day, "items": items, "completed_indices": sorted(completed)}
 
 
 @router.post(

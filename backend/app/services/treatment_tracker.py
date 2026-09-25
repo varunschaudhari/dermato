@@ -87,6 +87,7 @@ def update_treatment_plan(db, patient_id: int, condition: str, session, severity
         "severity_at_start": severity,
         "remedy_type": recommendation["type"],
         "remedy_text": ", ".join(recommendation.get("examples", [])),
+        "how_to": recommendation.get("how_to"),
         "duration_weeks": recommendation.get("duration_weeks"),
         "expected_recheck_at": (session.captured_at + timedelta(weeks=weeks)) if weeks else None,
         "status": "active",
@@ -99,3 +100,28 @@ def update_treatment_plan(db, patient_id: int, condition: str, session, severity
     }
     db.treatment_plans.insert_one(new_plan_doc)
     return resolved
+
+
+def checklist_items_for_plan(plan: dict) -> list:
+    """Derives today's routine checklist from the plan's snapshotted how_to
+    (falling back to remedy_text for plans predating the how_to field). Takes
+    a raw Mongo doc, not a to_ns()-wrapped object -- every call site already
+    has the plan as a dict from db.treatment_plans.find_one(...).
+
+    Referral-tier plans ("book a consultation...") have no daily routine to
+    check off -- the severity-guidance banner covers that case instead.
+    Splits ONLY on literal newlines, never on sentences: the seeded how_to
+    text mixes daily actions with conditional warnings and every-few-days
+    cadences (e.g. "Stop and reassess if you notice redness", "2-3 nights a
+    week to build tolerance") that a naive sentence-split would turn into
+    wrong daily checkboxes. With no newlines, the whole string becomes one
+    honest single item rather than a mis-parsed list."""
+    if plan.get("remedy_type") == "Referral":
+        return []
+
+    text = (plan.get("how_to") or plan.get("remedy_text") or "").strip()
+    if not text:
+        return []
+    if "\n" in text:
+        return [line.strip() for line in text.split("\n") if line.strip()]
+    return [text]

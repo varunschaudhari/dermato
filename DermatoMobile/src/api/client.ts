@@ -48,7 +48,10 @@ export interface AnalyzeResult {
   wsi: Record<string, number | null>;
   flags: Record<string, string | null>;
   previous_severity?: Record<string, Severity>;
-  recommendations: Record<string, { type: string; examples: string[]; duration_weeks?: number; how_to?: string | null; escalated?: boolean } | string>;
+  recommendations: Record<
+    string,
+    { type: string; examples: string[]; duration_weeks?: number; how_to?: string | null; escalated?: boolean; patient_guidance?: string | null } | string
+  >;
   overlays?: Overlays;
   ml_detections?: {
     detections: MlDetection[];
@@ -56,6 +59,16 @@ export interface AnalyzeResult {
     skin_problem_counts?: Record<string, number>;
   } | null;
 }
+
+export interface ConditionEducation {
+  _id: string;
+  causes: string;
+  what_to_expect: string;
+  timeline: string;
+  severe_guidance: string;
+}
+
+export const getConditionEducation = () => api.get<ConditionEducation[]>('/education/');
 
 // FastAPI's `detail` field takes three different shapes depending on the
 // failure: a plain string (most HTTPExceptions), an object like
@@ -205,6 +218,7 @@ export interface TreatmentPlanOut {
   severity_at_start: Severity;
   remedy_type: string;
   remedy_text: string;
+  how_to?: string | null;
   duration_weeks?: string | null;
   expected_recheck_at?: string | null;
   status: 'active' | 'resolved';
@@ -224,6 +238,23 @@ export const updateTreatmentAdherence = (
   planId: number,
   adherence: 'followed' | 'partial' | 'not_followed'
 ) => api.patch<TreatmentPlanOut>(`/patients/${patientId}/treatment-plans/${planId}/adherence`, { adherence });
+
+export interface TreatmentChecklist {
+  date: string;
+  items: string[];
+  completed_indices: number[];
+}
+
+export const getTreatmentChecklist = (patientId: number, planId: number, date?: string) =>
+  api.get<TreatmentChecklist>(`/patients/${patientId}/treatment-plans/${planId}/checklist`, {
+    params: date ? { date } : {},
+  });
+
+export const updateTreatmentChecklist = (
+  patientId: number,
+  planId: number,
+  payload: { index: number; completed: boolean; date?: string }
+) => api.patch<TreatmentChecklist>(`/patients/${patientId}/treatment-plans/${planId}/checklist`, payload);
 
 export const updatePatientNote = (sessionId: number, note: string) =>
   api.patch<SessionOut>(`/sessions/${sessionId}/patient-note`, { note });
@@ -273,7 +304,8 @@ export interface NotificationOut {
   created_at: string;
 }
 
-export const getNotifications = () => api.get<NotificationOut[]>('/notifications/');
+export const getNotifications = (limit?: number, skip?: number) =>
+  api.get<NotificationOut[]>('/notifications/', { params: { ...(limit ? { limit } : {}), ...(skip ? { skip } : {}) } });
 
 export const markNotificationRead = (id: number) => api.patch<NotificationOut>(`/notifications/${id}/read`);
 

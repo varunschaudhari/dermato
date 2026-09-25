@@ -118,6 +118,7 @@ class TreatmentPlanOut(BaseModel):
     severity_at_start: str
     remedy_type: str
     remedy_text: str
+    how_to: Optional[str] = None
     duration_weeks: Optional[str] = None
     expected_recheck_at: Optional[datetime] = None
     status: str
@@ -130,6 +131,12 @@ class TreatmentPlanOut(BaseModel):
 
 class AdherenceUpdate(BaseModel):
     adherence: str
+
+
+class ChecklistToggle(BaseModel):
+    index: int
+    completed: bool
+    date: Optional[str] = None
 
 
 class PushTokenUpdate(BaseModel):
@@ -286,6 +293,13 @@ class DoctorOption(BaseModel):
     credentials: Optional[str] = None
     bio: Optional[str] = None
     avatar_url: Optional[str] = None
+
+
+class ConditionEducationUpdate(BaseModel):
+    causes: str
+    what_to_expect: str
+    timeline: str
+    severe_guidance: str
 
 
 class ImportError_(BaseModel):

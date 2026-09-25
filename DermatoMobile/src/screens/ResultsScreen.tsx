@@ -26,7 +26,9 @@ import {
   getPatientSessions,
   getTreatmentPlans,
   updatePatientNote,
+  getConditionEducation,
   AnalyzeResult,
+  ConditionEducation,
   SessionOut,
   TreatmentPlanOut,
 } from '../api/client';
@@ -34,7 +36,11 @@ import { computeSkinScoreFromSeverities, computeSkinScoreFromSession, scoreMeta 
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
 
-type RootStackParamList = { MainTabs: { screen: string } | undefined; Results: { result: AnalyzeResult } };
+type RootStackParamList = {
+  MainTabs: { screen: string } | undefined;
+  Results: { result: AnalyzeResult };
+  Appointments: undefined;
+};
 
 const FILTER_CONDITIONS = ['acne', 'wrinkle', 'pigmentation', 'pore'];
 
@@ -212,6 +218,41 @@ function PatientNoteCard({ sessionId }: { sessionId: number }) {
   );
 }
 
+function AboutConditionCard({ condition, info }: { condition: string; info: ConditionEducation }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        onPress={() => setOpen((v) => !v)}
+        style={styles.aboutHeaderRow}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: open }}
+        accessibilityLabel={`About ${CONDITION_LABELS[condition] ?? condition}`}
+      >
+        <Text style={styles.cardTitle}>About {CONDITION_LABELS[condition] ?? condition}</Text>
+        {open ? <ChevronUp size={18} color={COLORS.mutedGray} /> : <ChevronDown size={18} color={COLORS.mutedGray} />}
+      </TouchableOpacity>
+      {open && (
+        <View style={{ marginTop: 10, gap: 10 }}>
+          <View>
+            <Text style={styles.aboutLabel}>Causes</Text>
+            <Text style={styles.aboutText}>{info.causes}</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>What to expect</Text>
+            <Text style={styles.aboutText}>{info.what_to_expect}</Text>
+          </View>
+          <View>
+            <Text style={styles.aboutLabel}>Timeline</Text>
+            <Text style={styles.aboutText}>{info.timeline}</Text>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -226,6 +267,7 @@ export default function ResultsScreen() {
   const [activeOverlays, setActiveOverlays] = useState<string[]>([]);
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
+  const [education, setEducation] = useState<ConditionEducation[]>([]);
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
   const [selected, setSelected] = useState<string[]>(FILTER_CONDITIONS);
 
@@ -246,6 +288,12 @@ export default function ResultsScreen() {
         .catch((err) => console.warn('Failed to load sessions/plans for results extras:', err));
     }, [patientId])
   );
+
+  useEffect(() => {
+    getConditionEducation()
+      .then((r) => setEducation(r.data))
+      .catch((err) => console.warn('Failed to load condition education:', err));
+  }, []);
 
   useEffect(() => {
     if (!imageUrl) return;
@@ -606,13 +654,36 @@ export default function ResultsScreen() {
             {rec.escalated && (
               <Text style={styles.escalated}>Previous remedies haven't helped, so this was bumped up a tier.</Text>
             )}
+            {rec.patient_guidance ? (
+              <View style={styles.guidanceBanner}>
+                <AlertTriangle size={14} color="#92400e" style={{ marginTop: 1 }} />
+                <Text style={styles.guidanceBannerText}>{rec.patient_guidance}</Text>
+              </View>
+            ) : null}
             {rec.examples?.map((ex: string) => (
               <Text key={ex} style={styles.recExample}>• {ex}</Text>
             ))}
             {rec.how_to ? <Text style={styles.howTo}>{rec.how_to}</Text> : null}
             {rec.duration_weeks ? <Text style={styles.duration}>Duration: {rec.duration_weeks} weeks</Text> : null}
+            {rec.type === 'Referral' && (
+              <TouchableOpacity
+                style={styles.bookButton}
+                onPress={() => navigation.navigate('Appointments')}
+                accessibilityRole="button"
+                accessibilityLabel="Book Appointment"
+              >
+                <CalendarClock size={14} color="#fff" />
+                <Text style={styles.bookButtonText}>Book Appointment</Text>
+              </TouchableOpacity>
+            )}
           </View>
         );
+      })}
+
+      <Text style={styles.sectionTitle}>About your conditions</Text>
+      {recommendationsToShow.map(([condition]) => {
+        const info = education.find((e) => e._id === condition);
+        return info ? <AboutConditionCard key={condition} condition={condition} info={info} /> : null;
       })}
 
       <PatientNoteCard sessionId={result.session_id} />
@@ -730,6 +801,31 @@ const styles = StyleSheet.create({
   recExample: { fontSize: 13, color: '#4b5563', marginTop: 2 },
   howTo: { fontSize: 12, color: COLORS.mutedGray, marginTop: 6, lineHeight: 17 },
   duration: { fontSize: 11, color: COLORS.mutedGray, marginTop: 6 },
+  guidanceBanner: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 10,
+    padding: 10,
+    marginBottom: 8,
+  },
+  guidanceBannerText: { flex: 1, fontSize: 12, color: '#92400e', lineHeight: 17 },
+  bookButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.teal,
+    borderRadius: 8,
+    paddingVertical: 9,
+    marginTop: 10,
+  },
+  bookButtonText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  aboutHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  aboutLabel: { fontSize: 10, fontWeight: '700', color: COLORS.mutedGray, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  aboutText: { fontSize: 13, color: '#4b5563', lineHeight: 18 },
   disclaimer: { fontSize: 11, color: COLORS.mutedGray, fontStyle: 'italic', marginTop: 12, marginBottom: 20 },
   ctaRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
   button: { flex: 1, backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },

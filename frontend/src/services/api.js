@@ -91,6 +91,10 @@ export const getAnalyticsSummary = () => api.get('/analytics/summary')
 export const getTreatmentPlans = (patientId) => api.get(`/patients/${patientId}/treatment-plans`)
 export const updateTreatmentAdherence = (patientId, planId, adherence) =>
   api.patch(`/patients/${patientId}/treatment-plans/${planId}/adherence`, { adherence })
+export const getTreatmentChecklist = (patientId, planId, date) =>
+  api.get(`/patients/${patientId}/treatment-plans/${planId}/checklist`, { params: date ? { date } : {} })
+export const updateTreatmentChecklist = (patientId, planId, payload) =>
+  api.patch(`/patients/${patientId}/treatment-plans/${planId}/checklist`, payload)
 export const updateSkinHistory = (patientId, data) => api.patch(`/patients/${patientId}/skin-history`, data)
 export const getOverdueRecheck = () => api.get('/patients/overdue-recheck')
 export const deletePatient = (patientId) => api.delete(`/patients/${patientId}`)
@@ -98,7 +102,8 @@ export const exportPatientData = (patientId) => api.get(`/patients/${patientId}/
 export const importPatientsCsv = (formData) =>
   api.post('/patients/import', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 
-export const getNotifications = (limit) => api.get('/notifications/', { params: limit ? { limit } : {} })
+export const getNotifications = (limit, skip) =>
+  api.get('/notifications/', { params: { ...(limit ? { limit } : {}), ...(skip ? { skip } : {}) } })
 export const markNotificationRead = (id) => api.patch(`/notifications/${id}/read`)
 export const markAllNotificationsRead = () => api.post('/notifications/read-all')
 export const markPatientMessagesRead = (patientId) => api.post(`/notifications/read-for-patient/${patientId}`)
@@ -118,3 +123,6 @@ export const updateAppointmentStatus = (id, status) => api.patch(`/appointments/
 
 export const getRemedies = () => api.get('/remedies/')
 export const updateRemedy = (condition, severity, data) => api.put(`/remedies/${condition}/${severity}`, data)
+
+export const getConditionEducation = () => api.get('/education/')
+export const updateConditionEducation = (condition, data) => api.put(`/education/${condition}`, data)

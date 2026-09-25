@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.api.routes import analysis, analytics, appointments, auth, notifications, remedies, sessions, patients
+from app.api.routes import analysis, analytics, appointments, auth, education, notifications, remedies, sessions, patients
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.security import get_current_user, hash_password, require_role
@@ -79,6 +79,12 @@ app.include_router(
     prefix="/api/remedies",
     tags=["Remedies"],
     dependencies=[Depends(require_role("admin"))],
+)
+app.include_router(
+    education.router,
+    prefix="/api/education",
+    tags=["Education"],
+    dependencies=[Depends(get_current_user)],
 )
 app.include_router(
     notifications.router,

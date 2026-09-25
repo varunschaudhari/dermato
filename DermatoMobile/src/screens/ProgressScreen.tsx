@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowRight, TrendingUp, ClipboardList } from 'lucide-react-native';
+import { ArrowRight, TrendingUp, ClipboardList, CheckSquare, Square } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import {
   getPatientSessions,
@@ -10,9 +10,12 @@ import {
   getPatient,
   updateSkinHistory,
   updateTreatmentAdherence,
+  getTreatmentChecklist,
+  updateTreatmentChecklist,
   absoluteUrl,
   SessionOut,
   TreatmentPlanOut,
+  TreatmentChecklist,
   SkinHistory,
 } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
@@ -239,6 +242,55 @@ const ADHERENCE_LABELS: Record<string, string> = {
   not_followed: "You said: Didn't follow it",
 };
 
+function RoutineChecklist({ plan, patientId }: { plan: TreatmentPlanOut; patientId: number }) {
+  const [checklist, setChecklist] = useState<TreatmentChecklist | null>(null);
+  const [toggling, setToggling] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      getTreatmentChecklist(patientId, plan.id)
+        .then((r) => setChecklist(r.data))
+        .catch(() => setChecklist(null));
+    }, [patientId, plan.id])
+  );
+
+  if (!checklist || checklist.items.length === 0) return null;
+
+  const toggle = async (index: number, completed: boolean) => {
+    setToggling(true);
+    try {
+      const { data } = await updateTreatmentChecklist(patientId, plan.id, { index, completed });
+      setChecklist(data);
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  return (
+    <View style={styles.checklistBlock}>
+      <Text style={styles.checklistLabel}>Today's routine</Text>
+      {checklist.items.map((item, index) => {
+        const done = checklist.completed_indices.includes(index);
+        return (
+          <TouchableOpacity
+            key={index}
+            style={styles.checklistRow}
+            disabled={toggling}
+            onPress={() => toggle(index, !done)}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: done }}
+            accessibilityLabel={item}
+          >
+            {done ? <CheckSquare size={16} color={COLORS.teal} /> : <Square size={16} color={COLORS.mutedGray} />}
+            <Text style={[styles.checklistText, done && styles.checklistTextDone]}>{item}</Text>
+          </TouchableOpacity>
+        );
+      })}
+      <Text style={styles.checklistHint}>This checklist resets whenever you get an updated recommendation.</Text>
+    </View>
+  );
+}
+
 function AdherenceCheckIn({
   plan,
   patientId,
@@ -381,6 +433,9 @@ export default function ProgressScreen() {
                         </View>
                       )}
                       {p.status === 'active' && patientId != null && (
+                        <RoutineChecklist plan={p} patientId={patientId} />
+                      )}
+                      {p.status === 'active' && patientId != null && (
                         <AdherenceCheckIn plan={p} patientId={patientId} onUpdated={handleAdherenceUpdated} />
                       )}
                       {p.status === 'resolved' && p.severity_at_start && p.outcome_severity && (
@@ -480,4 +535,10 @@ const styles = StyleSheet.create({
   adherenceChip: { borderWidth: 1, borderColor: COLORS.teal, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   adherenceChipText: { color: COLORS.teal, fontWeight: '600', fontSize: 11 },
   adherenceAnswer: { fontSize: 11, color: COLORS.mutedGray, marginTop: 6, width: '100%' },
+  checklistBlock: { marginTop: 8, width: '100%', paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
+  checklistLabel: { fontSize: 11, fontWeight: '600', color: COLORS.secondaryText, marginBottom: 4 },
+  checklistRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingVertical: 3 },
+  checklistText: { flex: 1, fontSize: 12, color: COLORS.heading, lineHeight: 16 },
+  checklistTextDone: { color: COLORS.mutedGray, textDecorationLine: 'line-through' },
+  checklistHint: { fontSize: 10, color: COLORS.mutedGray, marginTop: 4 },
 });

@@ -3,7 +3,7 @@ import { useLocation, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import ReactCompareImage from 'react-compare-image'
 import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock, Sparkles, Waves, Palette, CircleDot } from 'lucide-react'
-import { getPatientSessions, getTreatmentPlans, updatePatientNote } from '../services/api'
+import { getPatientSessions, getTreatmentPlans, updatePatientNote, getConditionEducation } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
@@ -105,6 +105,40 @@ function TriageBanner({ severityToShow, recommendationsToShow }) {
       }
       footnote="This is not a diagnosis and does not replace a clinical visit. See a doctor promptly if any area is bleeding, rapidly changing, or not healing — regardless of this result."
     />
+  )
+}
+
+function AboutConditionCard({ condition, info }) {
+  const [open, setOpen] = useState(false)
+  if (!info) return null
+
+  return (
+    <Card>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <h3 className="font-medium capitalize text-gray-900 dark:text-gray-100">About {condition}</h3>
+        {open ? <ChevronUp className="w-5 h-5 text-gray-400 shrink-0" /> : <ChevronDown className="w-5 h-5 text-gray-400 shrink-0" />}
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3 text-sm text-gray-600 dark:text-gray-400">
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Causes</p>
+            <p>{info.causes}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">What to expect</p>
+            <p>{info.what_to_expect}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 dark:text-gray-500 uppercase tracking-wide mb-1">Timeline</p>
+            <p>{info.timeline}</p>
+          </div>
+        </div>
+      )}
+    </Card>
   )
 }
 
@@ -266,6 +300,13 @@ export default function ResultsPage() {
     enabled: !!patientId,
   })
   const previousSession = patientSessions.length >= 2 ? patientSessions[patientSessions.length - 2] : null
+
+  const { data: education = [] } = useQuery({
+    queryKey: ['condition-education'],
+    queryFn: () => getConditionEducation().then((r) => r.data),
+    staleTime: 5 * 60 * 1000,
+  })
+  const educationByCondition = Object.fromEntries(education.map((e) => [e._id, e]))
 
   // Staff always see the full breakdown (they never get the filter chips below); a
   // patient sees only whichever conditions they've toggled on, defaulting to all 4.
@@ -589,6 +630,9 @@ export default function ResultsPage() {
                   Previous remedies for this condition haven't helped, so this recommendation was bumped up a tier.
                 </p>
               )}
+              {rec.patient_guidance && (
+                <Alert variant="warning" title={rec.patient_guidance} className="mb-3" />
+              )}
               <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
                 {rec.examples.map((e) => <li key={e}>{e}</li>)}
               </ul>
@@ -606,6 +650,15 @@ export default function ResultsPage() {
             </Card>
           )
         })}
+      </div>
+
+      {/* Condition education */}
+      <div className="space-y-3">
+        {Object.keys(recommendationsToShow)
+          .filter((k) => k !== 'disclaimer')
+          .map((condition) => (
+            <AboutConditionCard key={condition} condition={condition} info={educationByCondition[condition]} />
+          ))}
       </div>
 
       {sessionId && <PatientNoteCard sessionId={sessionId} initialNote={state.results.patient_note} />}
