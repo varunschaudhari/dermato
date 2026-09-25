@@ -90,6 +90,26 @@ android {
     compileSdk rootProject.ext.compileSdkVersion
 
     namespace "com.dermatomobile"
+
+    // Windows hits the 260-char path limit compiling the New Architecture
+    // Fabric C++ codegen for autolinked libraries (react-native-screens,
+    // react-native-svg, react-native-safe-area-context all build theirs
+    // unconditionally, regardless of newArchEnabled) -- CMake/Ninja mirror
+    // each source file's full absolute path into the object file's build
+    // directory, and the default .cxx location nested deep under this
+    // project's path pushes several object files over the limit. This
+    // relocates just the .cxx staging directory; the project itself also
+    // needs to be built from a short root path (e.g. C:\a) for the other
+    // half of the embedded path (the source tree location) to fit too --
+    // this alone is not sufficient on its own.
+    if (System.getenv("CXX_BUILD_STAGING_DIR")) {
+        externalNativeBuild {
+            cmake {
+                buildStagingDirectory file(System.getenv("CXX_BUILD_STAGING_DIR"))
+            }
+        }
+    }
+
     defaultConfig {
         applicationId "com.dermatomobile"
         minSdkVersion rootProject.ext.minSdkVersion

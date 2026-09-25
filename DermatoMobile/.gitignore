@@ -77,6 +77,9 @@ ios/GoogleService-Info.plist
 android/app/*.jks
 android/keystore.properties
 
+# Built APKs handed to testers -- large binaries, never belong in git.
+/releases/
+
 # Yarn
 .yarn/*
 !.yarn/patches

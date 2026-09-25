@@ -8,7 +8,7 @@
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
   <!-- Requested at runtime via PermissionsAndroid before launchCamera() is
-       called (src/screens/AnalyzeScreen.tsx) -- react-native-image-picker's
+       called (src/screens/AnalyzeScreen.tsx). react-native-image-picker's
        "omit this permission and let the implicit Intent hand off to the
        system camera app" trick (the previous approach here) only works
        reliably on stock/AOSP-like camera apps; several OEM camera apps
