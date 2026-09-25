@@ -1,15 +1,19 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Image, FlatList, StyleSheet, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { View, Text, Image, FlatList, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { getPatientSessions, absoluteUrl, SessionOut } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
-import { ScanFace } from 'lucide-react-native';
+import { ScanFace, ChevronRight } from 'lucide-react-native';
+
+type RootStackParamList = { Report: { sessionId: number } };
 
 export default function HistoryScreen() {
   const { patientId } = useAuth();
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -47,7 +51,12 @@ export default function HistoryScreen() {
             ) : undefined
           }
           renderItem={({ item }) => (
-            <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => navigation.navigate('Report', { sessionId: item.id })}
+              accessibilityRole="button"
+              accessibilityLabel={`View full report for the scan from ${new Date(item.captured_at).toLocaleDateString()}`}
+            >
               <View style={styles.cardHeader}>
                 <Image
                   source={{ uri: absoluteUrl(item.image_url) }}
@@ -71,6 +80,7 @@ export default function HistoryScreen() {
                     })}
                   </View>
                 </View>
+                <ChevronRight size={18} color={COLORS.mutedGray} />
               </View>
               {item.doctor_note && (
                 <View style={styles.noteBox}>
@@ -78,7 +88,7 @@ export default function HistoryScreen() {
                   <Text style={styles.noteText}>{item.doctor_note}</Text>
                 </View>
               )}
-            </View>
+            </TouchableOpacity>
           )}
         />
       )}

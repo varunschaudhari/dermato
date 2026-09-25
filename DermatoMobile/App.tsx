@@ -16,6 +16,7 @@ import AnalyzeScreen from './src/screens/AnalyzeScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import ProgressScreen from './src/screens/ProgressScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
+import ReportScreen from './src/screens/ReportScreen';
 import MessagesScreen from './src/screens/MessagesScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -80,6 +81,7 @@ function RootNavigator() {
         <>
           <Stack.Screen name="MainTabs" component={MainTabs} />
           <Stack.Screen name="Results" component={ResultsScreen} />
+          <Stack.Screen name="Report" component={ReportScreen} />
           <Stack.Screen name="Messages" component={MessagesScreen} />
           <Stack.Screen name="Notifications" component={NotificationsScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />

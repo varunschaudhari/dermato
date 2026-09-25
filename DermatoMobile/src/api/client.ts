@@ -199,6 +199,8 @@ export interface SessionOut {
   patient_id: number;
   captured_at: string;
   image_url: string;
+  images?: Record<string, string>;
+  model_powered?: boolean;
   acne_severity?: Severity;
   pigmentation_severity?: Severity;
   wrinkle_severity?: Severity;
@@ -206,9 +208,17 @@ export interface SessionOut {
   acne_wsi?: number | null;
   pigmentation_wsi?: number | null;
   wrinkle_wsi?: number | null;
+  acne_flag?: string | null;
+  pigmentation_flag?: string | null;
+  wrinkle_flag?: string | null;
+  recommendations?: Record<string, any> | null;
+  ml_detections?: Record<string, any> | null;
+  overlays?: Record<string, any> | null;
   doctor_note?: string | null;
   patient_note?: string | null;
 }
+
+export const getSession = (sessionId: number) => api.get<SessionOut>(`/sessions/${sessionId}`);
 
 export interface TreatmentPlanOut {
   id: number;

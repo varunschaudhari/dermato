@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, PermissionsAndroid, Platform } from 'react-native';
 import { Lightbulb, Check, Plus } from 'lucide-react-native';
 import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
@@ -73,6 +73,13 @@ export default function AnalyzeScreen() {
   };
 
   const pickFrom = async (source: 'camera' | 'gallery', angle: Angle) => {
+    if (source === 'camera' && Platform.OS === 'android') {
+      const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.CAMERA);
+      if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+        setError('Camera permission was denied. Enable it in your device settings to take a photo.');
+        return;
+      }
+    }
     const result = source === 'camera' ? await launchCamera({ mediaType: 'photo', quality: 0.8 }) : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
     // Both didCancel and errorCode leave `assets` empty -- without checking
     // these first, a denied permission or a camera-less device (e.g. some

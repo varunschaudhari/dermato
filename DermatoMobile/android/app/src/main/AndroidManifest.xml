@@ -7,14 +7,16 @@
        genuinely is the library's documented contract, not a footgun. -->
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-  <!-- Deliberately NOT requesting android.permission.CAMERA: this app only ever
-       calls react-native-image-picker's launchCamera(), which delegates to the
-       system camera app via an implicit Intent when this permission is absent
-       from the manifest, and that app handles its own permission prompt. If this
-       permission IS declared, the library instead expects the CALLING app to
-       have obtained it at runtime first (via PermissionsAndroid, which nothing
-       in this codebase does), and throws instead of prompting when it hasn't
-       been. Re-add this only alongside actual PermissionsAndroid.request() handling. -->
+  <!-- Requested at runtime via PermissionsAndroid before launchCamera() is
+       called (src/screens/AnalyzeScreen.tsx) -- react-native-image-picker's
+       "omit this permission and let the implicit Intent hand off to the
+       system camera app" trick (the previous approach here) only works
+       reliably on stock/AOSP-like camera apps; several OEM camera apps
+       (confirmed by a real-device report: camera did nothing, gallery
+       picker worked fine) don't handle a caller that lacks the permission
+       gracefully. Declaring it and requesting it explicitly is the
+       universally-compatible path. -->
+  <uses-permission android:name="android.permission.CAMERA" />
   <uses-feature
     android:name="android.hardware.camera"
     android:required="false" />
