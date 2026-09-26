@@ -1,11 +1,12 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, Image, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Share } from 'react-native';
+import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Share } from 'react-native';
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, Share2, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { absoluteUrl, getSession, getTreatmentPlans, SessionOut, TreatmentPlanOut } from '../api/client';
+import { absoluteUrl, getSession, getTreatmentPlans, updateDoctorNote, SessionOut, TreatmentPlanOut } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
+import { useAuth } from '../context/AuthContext';
 
 type RootStackParamList = { Report: { sessionId: number } };
 
@@ -60,11 +61,16 @@ export default function ReportScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Report'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { sessionId } = route.params;
+  const { role } = useAuth();
+  const isDoctor = role === 'dermatologist';
 
   const [session, setSession] = useState<SessionOut | null>(null);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,6 +92,17 @@ export default function ReportScreen() {
   }, [sessionId]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const handleSaveNote = async () => {
+    setSavingNote(true);
+    try {
+      const { data } = await updateDoctorNote(sessionId, noteDraft.trim());
+      setSession(data);
+      setEditingNote(false);
+    } finally {
+      setSavingNote(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -188,12 +205,61 @@ export default function ReportScreen() {
         </>
       )}
 
-      {session.doctor_note && (
+      {(session.doctor_note || isDoctor) && (
         <>
-          <Text style={styles.sectionTitle}>Doctor's Note</Text>
-          <View style={styles.noteBox}>
-            <Text style={styles.noteText}>{session.doctor_note}</Text>
+          <View style={styles.noteHeaderRow}>
+            <Text style={styles.sectionTitle}>Doctor's Note</Text>
+            {isDoctor && !editingNote && (
+              <TouchableOpacity
+                onPress={() => {
+                  setNoteDraft(session.doctor_note || '');
+                  setEditingNote(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Edit doctor's note"
+              >
+                <Text style={styles.editLink}>{session.doctor_note ? 'Edit' : 'Add note'}</Text>
+              </TouchableOpacity>
+            )}
           </View>
+          {editingNote ? (
+            <View style={styles.noteBox}>
+              <TextInput
+                style={styles.noteInput}
+                value={noteDraft}
+                onChangeText={setNoteDraft}
+                multiline
+                placeholder="Add a clinical note for this visit…"
+                placeholderTextColor={COLORS.mutedGray}
+              />
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSaveNote}
+                  disabled={savingNote}
+                  accessibilityRole="button"
+                  accessibilityLabel={savingNote ? 'Saving note' : 'Save note'}
+                >
+                  <Text style={styles.saveButtonText}>{savingNote ? 'Saving...' : 'Save'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={() => setEditingNote(false)}
+                  disabled={savingNote}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel editing note"
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : session.doctor_note ? (
+            <View style={styles.noteBox}>
+              <Text style={styles.noteText}>{session.doctor_note}</Text>
+            </View>
+          ) : (
+            <Text style={styles.emptyNoteText}>No note added yet.</Text>
+          )}
         </>
       )}
 
@@ -264,8 +330,16 @@ const styles = StyleSheet.create({
   historyText: { fontSize: 12, color: '#4b5563', lineHeight: 17 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
   statusBadgeText: { fontSize: 11, fontWeight: '700' },
+  noteHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  editLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
   noteBox: { backgroundColor: COLORS.tealSoft, borderRadius: 12, padding: 12, marginBottom: 20 },
   noteText: { fontSize: 13, color: '#374151', lineHeight: 19 },
+  noteInput: { fontSize: 13, color: COLORS.heading, minHeight: 70, textAlignVertical: 'top' },
+  emptyNoteText: { fontSize: 13, color: COLORS.mutedGray, marginBottom: 20 },
+  saveButton: { backgroundColor: COLORS.teal, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  saveButtonText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  cancelButton: { borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  cancelButtonText: { color: COLORS.secondaryText, fontWeight: '600', fontSize: 12 },
   footer: { borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 14, marginBottom: 30, gap: 4 },
   footerText: { fontSize: 11, fontWeight: '600', color: COLORS.mutedGray },
   footerDisclaimer: { fontSize: 11, color: COLORS.mutedGray, fontStyle: 'italic' },

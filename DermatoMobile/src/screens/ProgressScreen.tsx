@@ -3,7 +3,8 @@ import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, Touchabl
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowRight, TrendingUp, ClipboardList, CheckSquare, Square } from 'lucide-react-native';
-import { useAuth } from '../context/AuthContext';
+import { usePatientScope } from '../hooks/usePatientScope';
+import { useSelectedPatient } from '../context/SelectedPatientContext';
 import {
   getPatientSessions,
   getTreatmentPlans,
@@ -242,7 +243,11 @@ const ADHERENCE_LABELS: Record<string, string> = {
   not_followed: "You said: Didn't follow it",
 };
 
-function RoutineChecklist({ plan, patientId }: { plan: TreatmentPlanOut; patientId: number }) {
+// readOnly is set for a dermatologist viewing a patient's checklist -- the
+// backend 403s update_treatment_checklist for any non-patient role anyway
+// (patients.py:295), so this is a view-only render rather than a permission
+// check, but a plain read-only list is better UX than a blocked toggle.
+function RoutineChecklist({ plan, patientId, readOnly }: { plan: TreatmentPlanOut; patientId: number; readOnly?: boolean }) {
   const [checklist, setChecklist] = useState<TreatmentChecklist | null>(null);
   const [toggling, setToggling] = useState(false);
 
@@ -275,7 +280,7 @@ function RoutineChecklist({ plan, patientId }: { plan: TreatmentPlanOut; patient
           <TouchableOpacity
             key={index}
             style={styles.checklistRow}
-            disabled={toggling}
+            disabled={readOnly || toggling}
             onPress={() => toggle(index, !done)}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: done }}
@@ -286,7 +291,7 @@ function RoutineChecklist({ plan, patientId }: { plan: TreatmentPlanOut; patient
           </TouchableOpacity>
         );
       })}
-      <Text style={styles.checklistHint}>This checklist resets whenever you get an updated recommendation.</Text>
+      {!readOnly && <Text style={styles.checklistHint}>This checklist resets whenever you get an updated recommendation.</Text>}
     </View>
   );
 }
@@ -335,7 +340,8 @@ function AdherenceCheckIn({
 }
 
 export default function ProgressScreen() {
-  const { patientId } = useAuth();
+  const { patientId, patientName, isOwn, canEdit } = usePatientScope();
+  const { setSelectedPatient } = useSelectedPatient();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
@@ -355,6 +361,10 @@ export default function ProgressScreen() {
       setSessions(s.data);
       setPlans([...p.data].reverse());
       setSkinHistory(patient.data.skin_history);
+      // Arriving here from a notification deep-link only carries a patient
+      // id, not a name (see NotificationsScreen) -- fill it in now that the
+      // real record has loaded, so the header stops showing a blank name.
+      if (!isOwn && !patientName) setSelectedPatient(patientId, patient.data.name);
       setError('');
     } catch {
       setError("Couldn't load your progress.");
@@ -376,7 +386,7 @@ export default function ProgressScreen() {
       refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor="#0d9488" />}
     >
       <View style={styles.headerRow}>
-        <Text style={styles.title}>Progress</Text>
+        <Text style={styles.title}>{isOwn ? 'Progress' : `${patientName || 'Patient'}'s Progress`}</Text>
         <TouchableOpacity
           onPress={() => navigation.navigate('Messages')}
           accessibilityRole="button"
@@ -433,10 +443,16 @@ export default function ProgressScreen() {
                         </View>
                       )}
                       {p.status === 'active' && patientId != null && (
-                        <RoutineChecklist plan={p} patientId={patientId} />
+                        <RoutineChecklist plan={p} patientId={patientId} readOnly={!canEdit} />
                       )}
                       {p.status === 'active' && patientId != null && (
-                        <AdherenceCheckIn plan={p} patientId={patientId} onUpdated={handleAdherenceUpdated} />
+                        canEdit ? (
+                          <AdherenceCheckIn plan={p} patientId={patientId} onUpdated={handleAdherenceUpdated} />
+                        ) : (
+                          <Text style={styles.adherenceAnswer}>
+                            {p.adherence ? ADHERENCE_LABELS[p.adherence] : 'Not yet reported'}
+                          </Text>
+                        )
                       )}
                       {p.status === 'resolved' && p.severity_at_start && p.outcome_severity && (
                         <View style={styles.transitionRow}>

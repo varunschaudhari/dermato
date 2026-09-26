@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { View, Text, Image, FlatList, StyleSheet, RefreshControl, TouchableOpacity, TextInput } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useAuth } from '../context/AuthContext';
+import { usePatientScope } from '../hooks/usePatientScope';
 import { getPatientSessions, absoluteUrl, SessionOut } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
@@ -12,7 +12,7 @@ import { ScanFace, ChevronRight, Search } from 'lucide-react-native';
 type RootStackParamList = { Report: { sessionId: number } };
 
 export default function HistoryScreen() {
-  const { patientId } = useAuth();
+  const { patientId, patientName, isOwn } = usePatientScope();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [sessions, setSessions] = useState<SessionOut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +51,7 @@ export default function HistoryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Scan History</Text>
+      <Text style={styles.title}>{isOwn ? 'Scan History' : `${patientName}'s History`}</Text>
       {error && sessions.length === 0 ? (
         <ErrorState message={error} onRetry={load} />
       ) : (

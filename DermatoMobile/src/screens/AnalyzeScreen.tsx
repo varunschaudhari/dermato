@@ -5,9 +5,12 @@ import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-pick
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
+import { usePatientScope } from '../hooks/usePatientScope';
+import { useSelectedPatient } from '../context/SelectedPatientContext';
 import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
 import { COLORS } from '../constants';
 import FormError from '../components/FormError';
+import PatientPickerField from '../components/PatientPickerField';
 
 type QualityStatus = 'idle' | 'checking' | 'ok' | 'failed';
 type Angle = 'front' | 'left' | 'right';
@@ -44,7 +47,9 @@ export default function AnalyzeScreen() {
   const [qualityMessage, setQualityMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { patientId, logout, fullName } = useAuth();
+  const { logout, fullName } = useAuth();
+  const { patientId, patientName, isOwn } = usePatientScope();
+  const { setSelectedPatient } = useSelectedPatient();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
   const photo = photos[activeAngle];
@@ -135,107 +140,126 @@ export default function AnalyzeScreen() {
       </View>
       <Text style={styles.subtitle}>{fullName ? `Hi ${fullName.split(' ')[0]} — ` : ''}Upload a clear, well-lit photo to get started</Text>
 
-      <View style={styles.tipsBox}>
-        <Lightbulb size={16} color="#d97706" style={styles.tipsIcon} />
-        <View style={styles.tipsTextWrap}>
-          {CAPTURE_TIPS.map((tip) => (
-            <Text key={tip} style={styles.tipsText}>{tip}</Text>
-          ))}
+      {!isOwn && !patientId ? (
+        // Defensive fallback -- in the normal flow a dermatologist always
+        // arrives here with a patient already selected via PatientListScreen/
+        // DoctorHomeScreen/MessagesInboxScreen (see App.tsx), but this keeps
+        // Analyze from being a dead end if that ever isn't the case.
+        <View style={styles.pickerGate}>
+          <Text style={styles.pickerGateTitle}>Choose a patient to analyze for</Text>
+          <PatientPickerField onSelect={(id, name) => setSelectedPatient(id, name)} />
         </View>
-      </View>
+      ) : (
+        <>
+          {!isOwn && (
+            <View style={styles.forPatientBanner}>
+              <Text style={styles.forPatientBannerText}>Analyzing for {patientName}</Text>
+            </View>
+          )}
 
-      <View style={styles.angleRow}>
-        {ANGLES.map(({ key, label, required }) => {
-          const captured = !!photos[key];
-          const active = activeAngle === key;
-          if (!required && !captured && !active) {
-            return (
-              <TouchableOpacity
-                key={key}
-                style={styles.angleChipAdd}
-                onPress={() => setActiveAngle(key)}
-                accessibilityRole="button"
-                accessibilityLabel={`Add ${label.toLowerCase()}`}
-              >
-                <Plus size={12} color={COLORS.teal} />
-                <Text style={styles.angleChipAddText}>{label}</Text>
-              </TouchableOpacity>
-            );
-          }
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[styles.angleChip, active && styles.angleChipActive]}
-              onPress={() => setActiveAngle(key)}
-              accessibilityRole="button"
-              accessibilityLabel={label}
-            >
-              {captured && <Check size={12} color={active ? '#fff' : COLORS.teal} />}
-              <Text style={[styles.angleChipText, active && styles.angleChipTextActive]}>{label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      <View style={styles.photoBox}>
-        {photo ? (
-          <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel={`Selected ${activeAngle} photo preview`} />
-        ) : (
-          <Text style={styles.photoPlaceholder}>No photo selected</Text>
-        )}
-        {activeAngle === 'front' && qualityStatus === 'checking' && (
-          <View style={styles.qualityOverlay}>
-            <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.qualityOverlayText}>Checking photo quality…</Text>
+          <View style={styles.tipsBox}>
+            <Lightbulb size={16} color="#d97706" style={styles.tipsIcon} />
+            <View style={styles.tipsTextWrap}>
+              {CAPTURE_TIPS.map((tip) => (
+                <Text key={tip} style={styles.tipsText}>{tip}</Text>
+              ))}
+            </View>
           </View>
-        )}
-      </View>
 
-      {activeAngle === 'front' && qualityStatus === 'ok' && (
-        <View style={styles.qualityOk}>
-          <Text style={styles.qualityOkText}>✓ Looks good</Text>
-        </View>
+          <View style={styles.angleRow}>
+            {ANGLES.map(({ key, label, required }) => {
+              const captured = !!photos[key];
+              const active = activeAngle === key;
+              if (!required && !captured && !active) {
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={styles.angleChipAdd}
+                    onPress={() => setActiveAngle(key)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${label.toLowerCase()}`}
+                  >
+                    <Plus size={12} color={COLORS.teal} />
+                    <Text style={styles.angleChipAddText}>{label}</Text>
+                  </TouchableOpacity>
+                );
+              }
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.angleChip, active && styles.angleChipActive]}
+                  onPress={() => setActiveAngle(key)}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                >
+                  {captured && <Check size={12} color={active ? '#fff' : COLORS.teal} />}
+                  <Text style={[styles.angleChipText, active && styles.angleChipTextActive]}>{label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.photoBox}>
+            {photo ? (
+              <Image source={{ uri: photo.uri }} style={styles.photoPreview} accessibilityLabel={`Selected ${activeAngle} photo preview`} />
+            ) : (
+              <Text style={styles.photoPlaceholder}>No photo selected</Text>
+            )}
+            {activeAngle === 'front' && qualityStatus === 'checking' && (
+              <View style={styles.qualityOverlay}>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.qualityOverlayText}>Checking photo quality…</Text>
+              </View>
+            )}
+          </View>
+
+          {activeAngle === 'front' && qualityStatus === 'ok' && (
+            <View style={styles.qualityOk}>
+              <Text style={styles.qualityOkText}>✓ Looks good</Text>
+            </View>
+          )}
+          {activeAngle === 'front' && qualityStatus === 'failed' && (
+            <View style={styles.qualityFailed}>
+              <Text style={styles.qualityFailedText}>{qualityMessage}</Text>
+            </View>
+          )}
+
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => pickFrom('camera', activeAngle)}
+              accessibilityRole="button"
+              accessibilityLabel="Take Photo"
+            >
+              <Text style={styles.secondaryButtonText}>Take Photo</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.secondaryButton}
+              onPress={() => pickFrom('gallery', activeAngle)}
+              accessibilityRole="button"
+              accessibilityLabel="Choose from Gallery"
+            >
+              <Text style={styles.secondaryButtonText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+          </View>
+
+          {error ? <FormError message={error} /> : null}
+
+          <TouchableOpacity
+            style={[
+              styles.button,
+              (!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
+                styles.buttonDisabled,
+            ]}
+            onPress={handleAnalyze}
+            disabled={!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+            accessibilityRole="button"
+            accessibilityLabel="Analyze Image"
+          >
+            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Image</Text>}
+          </TouchableOpacity>
+        </>
       )}
-      {activeAngle === 'front' && qualityStatus === 'failed' && (
-        <View style={styles.qualityFailed}>
-          <Text style={styles.qualityFailedText}>{qualityMessage}</Text>
-        </View>
-      )}
-
-      <View style={styles.row}>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => pickFrom('camera', activeAngle)}
-          accessibilityRole="button"
-          accessibilityLabel="Take Photo"
-        >
-          <Text style={styles.secondaryButtonText}>Take Photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => pickFrom('gallery', activeAngle)}
-          accessibilityRole="button"
-          accessibilityLabel="Choose from Gallery"
-        >
-          <Text style={styles.secondaryButtonText}>Choose from Gallery</Text>
-        </TouchableOpacity>
-      </View>
-
-      {error ? <FormError message={error} /> : null}
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          (!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
-            styles.buttonDisabled,
-        ]}
-        onPress={handleAnalyze}
-        disabled={!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
-        accessibilityRole="button"
-        accessibilityLabel="Analyze Image"
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Image</Text>}
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -246,6 +270,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700', color: COLORS.heading },
   logout: { color: '#dc2626', fontSize: 13, fontWeight: '600' },
   subtitle: { fontSize: 13, color: COLORS.secondaryText, marginTop: 4, marginBottom: 16 },
+  pickerGate: { marginTop: 4 },
+  pickerGateTitle: { fontSize: 14, fontWeight: '600', color: COLORS.heading, marginBottom: 10 },
+  forPatientBanner: { backgroundColor: COLORS.tealSoft, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 16 },
+  forPatientBannerText: { color: COLORS.teal, fontSize: 13, fontWeight: '600' },
   tipsBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, padding: 12, marginBottom: 16 },
   tipsIcon: { marginTop: 2 },
   tipsTextWrap: { flex: 1, gap: 3 },

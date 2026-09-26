@@ -3,6 +3,7 @@ import { View, Text, Image, ScrollView, TextInput, TouchableOpacity, StyleSheet,
 import { useFocusEffect } from '@react-navigation/native';
 import { CalendarPlus, Clock, CalendarClock } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
+import { usePatientScope } from '../hooks/usePatientScope';
 import {
   getAppointments,
   getAvailableDoctors,
@@ -18,6 +19,7 @@ import {
 import { COLORS } from '../constants';
 import FormError from '../components/FormError';
 import EmptyState from '../components/EmptyState';
+import PatientPickerField from '../components/PatientPickerField';
 
 function nextDays(n: number): { dateStr: string; weekday: string; dayNum: string }[] {
   const days = [];
@@ -39,7 +41,15 @@ const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
 };
 
 function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked: () => void }) {
-  const { patientId } = useAuth();
+  const { patientId: ownPatientId, isOwn } = usePatientScope();
+  // For a dermatologist booking on behalf of a patient -- independent of
+  // SelectedPatientContext, since Appointments is reachable without a patient
+  // already selected (e.g. from Results' "Book Appointment" CTA). The backend
+  // doesn't restrict which doctor a dermatologist can book a patient with
+  // (create_appointment has no "must be self" rule), matching web.
+  const [pickedPatientId, setPickedPatientId] = useState<number | null>(null);
+  const [pickedPatientName, setPickedPatientName] = useState<string | null>(null);
+  const patientId = isOwn ? ownPatientId : pickedPatientId;
   const [doctorId, setDoctorId] = useState<number | null>(null);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
@@ -78,6 +88,8 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
       setDate('');
       setTime('');
       setReason('');
+      setPickedPatientId(null);
+      setPickedPatientName(null);
       onBooked();
     } catch (err: any) {
       setError(getErrorMessage(err, 'Could not book appointment.'));
@@ -93,6 +105,34 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
         <Text style={styles.cardTitle}>Book an Appointment</Text>
       </View>
       {error ? <FormError message={error} /> : null}
+
+      {!isOwn && (
+        <>
+          <Text style={styles.fieldLabel}>Patient</Text>
+          {pickedPatientId ? (
+            <View style={styles.pickedPatientRow}>
+              <Text style={styles.pickedPatientText}>{pickedPatientName}</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setPickedPatientId(null);
+                  setPickedPatientName(null);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Change patient"
+              >
+                <Text style={styles.changeLink}>Change</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <PatientPickerField
+              onSelect={(id, name) => {
+                setPickedPatientId(id);
+                setPickedPatientName(name);
+              }}
+            />
+          )}
+        </>
+      )}
 
       <Text style={styles.fieldLabel}>Dermatologist</Text>
       <View style={styles.doctorRow}>
@@ -194,9 +234,9 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
       <TextInput style={styles.input} value={reason} onChangeText={setReason} placeholder="e.g. Follow-up on acne treatment" placeholderTextColor={COLORS.mutedGray} />
 
       <TouchableOpacity
-        style={[styles.saveButton, (!doctorId || !date || !time) && styles.saveButtonDisabled]}
+        style={[styles.saveButton, (!patientId || !doctorId || !date || !time) && styles.saveButtonDisabled]}
         onPress={handleSubmit}
-        disabled={saving || !doctorId || !date || !time}
+        disabled={saving || !patientId || !doctorId || !date || !time}
         accessibilityRole="button"
         accessibilityLabel="Book Appointment"
       >
@@ -207,6 +247,7 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
 }
 
 export default function AppointmentsScreen() {
+  const { role } = useAuth();
   const [appointments, setAppointments] = useState<AppointmentOut[]>([]);
   const [doctors, setDoctors] = useState<DoctorOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -226,6 +267,11 @@ export default function AppointmentsScreen() {
 
   const handleCancel = async (id: number) => {
     await updateAppointmentStatus(id, 'cancelled');
+    load();
+  };
+
+  const handleComplete = async (id: number) => {
+    await updateAppointmentStatus(id, 'completed');
     load();
   };
 
@@ -254,9 +300,16 @@ export default function AppointmentsScreen() {
             <Text style={[styles.statusBadgeText, { color: meta.text }]}>{appt.status}</Text>
           </View>
           {appt.status === 'scheduled' && (
-            <TouchableOpacity onPress={() => handleCancel(appt.id)} accessibilityRole="button" accessibilityLabel="Cancel appointment">
-              <Text style={styles.cancelLink}>Cancel</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              {role !== 'patient' && (
+                <TouchableOpacity onPress={() => handleComplete(appt.id)} accessibilityRole="button" accessibilityLabel="Mark appointment completed">
+                  <Text style={styles.completeLink}>Mark Completed</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity onPress={() => handleCancel(appt.id)} accessibilityRole="button" accessibilityLabel="Cancel appointment">
+                <Text style={styles.cancelLink}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </View>
@@ -304,6 +357,18 @@ const styles = StyleSheet.create({
   busyTimesText: { fontSize: 12, color: '#d97706', marginTop: 8 },
   hintText: { fontSize: 12, color: COLORS.mutedGray, marginTop: 4, marginBottom: 4 },
   input: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: COLORS.heading, backgroundColor: '#fff' },
+  pickedPatientRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.divider,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  pickedPatientText: { fontSize: 14, fontWeight: '600', color: COLORS.heading },
+  changeLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
   doctorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   doctorChip: {
     flexDirection: 'row',
@@ -356,4 +421,5 @@ const styles = StyleSheet.create({
   statusBadge: { borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
   cancelLink: { fontSize: 12, color: '#dc2626', fontWeight: '600' },
+  completeLink: { fontSize: 12, color: COLORS.teal, fontWeight: '600' },
 });

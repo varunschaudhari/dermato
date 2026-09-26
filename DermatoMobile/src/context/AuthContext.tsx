@@ -1,11 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { login as loginApi, getMe, clearPushToken } from '../api/client';
+import { login as loginApi, getMe, clearPushToken, UserOut } from '../api/client';
 import { registerForPushNotifications } from '../services/pushNotifications';
+
+// Roles allowed into this app. Admin-only web features (practice-wide
+// analytics, staff management, content editor, bulk CSV import) are
+// desk-oriented and don't have a mobile screen -- admins keep using the web
+// portal. patient_id is null for a legitimate dermatologist session (they
+// have no patient record of their own), so it can't be used as the gate.
+const ALLOWED_ROLES = ['patient', 'dermatologist'];
 
 interface AuthState {
   loading: boolean;
   token: string | null;
+  role: string | null;
+  userId: number | null;
   patientId: number | null;
   fullName: string | null;
   login: (phone: string, password: string) => Promise<void>;
@@ -16,9 +25,17 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+function assertAllowedRole(me: UserOut) {
+  if (!ALLOWED_ROLES.includes(me.role)) {
+    throw new Error('This app is for patients and dermatologists. Admins should sign in at dermato.cloud on the web.');
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [userId, setUserId] = useState<number | null>(null);
   const [patientId, setPatientId] = useState<number | null>(null);
   const [fullName, setFullName] = useState<string | null>(null);
 
@@ -27,14 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (stored) {
         try {
           const { data } = await getMe();
-          // This app only has patient-facing screens (Home/Analyze/History/
-          // Progress all key off patientId) -- a dermatologist or admin token
-          // has patient_id: null and would land on a UI with no working
-          // actions at all, e.g. Analyze silently no-ops on submit. Treat it
-          // the same as an invalid session rather than let them in.
-          if (data.patient_id == null) throw new Error('not a patient account');
+          assertAllowedRole(data);
           setToken(stored);
-          setPatientId(data.patient_id);
+          setRole(data.role);
+          setUserId(data.id);
+          setPatientId(data.patient_id ?? null);
           setFullName(data.full_name ?? null);
           registerForPushNotifications();
         } catch {
@@ -52,12 +66,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithToken = async (accessToken: string) => {
     await AsyncStorage.setItem('token', accessToken);
     const me = await getMe();
-    if (me.data.patient_id == null) {
+    try {
+      assertAllowedRole(me.data);
+    } catch (err) {
       await AsyncStorage.removeItem('token');
-      throw new Error('This app is for patients. Dermatologists and staff should sign in at dermato.cloud on the web.');
+      throw err;
     }
     setToken(accessToken);
-    setPatientId(me.data.patient_id);
+    setRole(me.data.role);
+    setUserId(me.data.id);
+    setPatientId(me.data.patient_id ?? null);
     setFullName(me.data.full_name ?? null);
     registerForPushNotifications();
   };
@@ -77,12 +95,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {}
     await AsyncStorage.removeItem('token');
     setToken(null);
+    setRole(null);
+    setUserId(null);
     setPatientId(null);
     setFullName(null);
   };
 
   return (
-    <AuthContext.Provider value={{ loading, token, patientId, fullName, login, loginWithToken, logout, updateFullName: setFullName }}>
+    <AuthContext.Provider
+      value={{ loading, token, role, userId, patientId, fullName, login, loginWithToken, logout, updateFullName: setFullName }}
+    >
       {children}
     </AuthContext.Provider>
   );

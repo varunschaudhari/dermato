@@ -270,6 +270,9 @@ export const updateTreatmentChecklist = (
 export const updatePatientNote = (sessionId: number, note: string) =>
   api.patch<SessionOut>(`/sessions/${sessionId}/patient-note`, { note });
 
+export const updateDoctorNote = (sessionId: number, note: string) =>
+  api.patch<SessionOut>(`/sessions/${sessionId}/note`, { note });
+
 export interface SkinHistory {
   allergies?: string;
   current_products?: string;
@@ -278,18 +281,58 @@ export interface SkinHistory {
   updated_at?: string;
 }
 
+export interface DoctorSummary {
+  id: number;
+  full_name: string | null;
+  email: string;
+}
+
 export interface PatientOut {
   id: number;
   name: string;
   age?: number | null;
   skin_type?: string | null;
   skin_history?: SkinHistory | null;
+  assigned_doctor_id?: number | null;
+  assigned_doctor?: DoctorSummary | null;
 }
 
 export const getPatient = (patientId: number) => api.get<PatientOut>(`/patients/${patientId}`);
 
 export const updateSkinHistory = (patientId: number, data: SkinHistory) =>
   api.patch<PatientOut>(`/patients/${patientId}/skin-history`, data);
+
+// Dermatologist-only in practice: the backend scopes this to {assigned to
+// self} OR {unclaimed} for a dermatologist, and to everyone for an admin --
+// patient accounts never call this (they only ever see their own record via
+// getPatient/useAuth().patientId).
+export const getPatients = () => api.get<PatientOut[]>('/patients/');
+
+export const assignDoctor = (patientId: number, doctorId?: number | null) =>
+  api.patch<PatientOut>(`/patients/${patientId}/assign-doctor`, { doctor_id: doctorId });
+
+export interface MessageInboxItem {
+  patient_id: number;
+  patient_name: string;
+  last_message?: string | null;
+  last_sender_name?: string | null;
+  last_sender_role?: string | null;
+  last_message_at?: string | null;
+  unread_count: number;
+}
+
+export const getMessagesInbox = () => api.get<MessageInboxItem[]>('/patients/messages/inbox');
+
+export interface OverdueRecheckOut {
+  patient_id: number;
+  patient_name: string;
+  condition: string;
+  remedy_type: string;
+  expected_recheck_at: string;
+  days_overdue: number;
+}
+
+export const getOverdueRecheck = () => api.get<OverdueRecheckOut[]>('/patients/overdue-recheck');
 
 export interface MessageOut {
   id: number;

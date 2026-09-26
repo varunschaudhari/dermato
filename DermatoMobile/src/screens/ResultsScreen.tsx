@@ -35,11 +35,14 @@ import {
 import { computeSkinScoreFromSeverities, computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
+import { useAuth } from '../context/AuthContext';
 
 type RootStackParamList = {
   MainTabs: { screen: string } | undefined;
   Results: { result: AnalyzeResult };
   Appointments: undefined;
+  Analyze: undefined;
+  Progress: undefined;
 };
 
 const FILTER_CONDITIONS = ['acne', 'wrinkle', 'pigmentation', 'pore'];
@@ -306,6 +309,11 @@ function SeverityGuideCard() {
 export default function ResultsScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'Results'>>();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { role } = useAuth();
+  // Analyze/History/Progress are MainTabs children for a patient, but root-
+  // Stack siblings for a dermatologist (see App.tsx) -- these two navigation
+  // shapes need different navigate() calls to reach the same screen.
+  const isPatient = role === 'patient';
   const { result } = route.params;
   const {
     severity, recommendations, model_powered: modelPowered, ml_detections: mlDetections,
@@ -746,14 +754,14 @@ export default function ResultsScreen() {
         return info ? <AboutConditionCard key={condition} condition={condition} info={info} /> : null;
       })}
 
-      <PatientNoteCard sessionId={result.session_id} />
+      {isPatient && <PatientNoteCard sessionId={result.session_id} />}
 
       <Text style={styles.disclaimer}>{(recommendations as any).disclaimer}</Text>
 
       <View style={styles.ctaRow}>
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('MainTabs', { screen: 'Analyze' })}
+          onPress={() => (isPatient ? navigation.navigate('MainTabs', { screen: 'Analyze' }) : navigation.navigate('Analyze'))}
           accessibilityRole="button"
           accessibilityLabel="New Analysis"
         >
@@ -761,7 +769,7 @@ export default function ResultsScreen() {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.secondaryButton}
-          onPress={() => navigation.navigate('MainTabs', { screen: 'Progress' })}
+          onPress={() => (isPatient ? navigation.navigate('MainTabs', { screen: 'Progress' }) : navigation.navigate('Progress'))}
           accessibilityRole="button"
           accessibilityLabel="View Progress"
         >

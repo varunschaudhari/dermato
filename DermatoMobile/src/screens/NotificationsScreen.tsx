@@ -8,12 +8,14 @@ import {
   markAllNotificationsRead,
   NotificationOut,
 } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+import { useSelectedPatient } from '../context/SelectedPatientContext';
 import { COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
 import { Bell } from 'lucide-react-native';
 
-type RootStackParamList = { MainTabs: { screen: string } | undefined };
+type RootStackParamList = { MainTabs: { screen: string } | undefined; Progress: undefined };
 
 function timeAgo(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -38,10 +40,25 @@ function tabForLink(link: string | null | undefined): string | null {
   return null;
 }
 
+// Doctor-targeted notifications (new_message, severity_worsened) link to
+// /progress/{patientId} same as patient-targeted ones -- confirmed against
+// patients.py's inbox notify and analysis.py's severity_worsened notify, both
+// of which use this exact f"/progress/{patient_id}" shape. No patient name
+// travels with the notification, so the id is set now and the name is filled
+// in by ProgressScreen once it loads that patient (see its usePatientScope
+// correction) -- the title just shows blank for a beat instead of stale text.
+function progressPatientIdFromLink(link: string | null | undefined): number | null {
+  if (!link) return null;
+  const match = link.match(/^\/progress\/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
 const PAGE_SIZE = 30;
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  const { role } = useAuth();
+  const { setSelectedPatient } = useSelectedPatient();
   const [notifications, setNotifications] = useState<NotificationOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,6 +102,17 @@ export default function NotificationsScreen() {
       LayoutAnimation.easeInEaseOut();
       setNotifications((prev) => prev.map((x) => (x.id === n.id ? { ...x, is_read: true } : x)));
       markNotificationRead(n.id).catch(() => {});
+    }
+    // Analyze/Progress are MainTabs children for a patient but root-Stack
+    // screens for a dermatologist (see App.tsx) -- these need different
+    // navigate() calls to reach the same screen.
+    if (role !== 'patient') {
+      const patientId = progressPatientIdFromLink(n.link);
+      if (patientId != null) {
+        setSelectedPatient(patientId, '');
+        navigation.navigate('Progress');
+      }
+      return;
     }
     const tab = tabForLink(n.link);
     if (tab) navigation.navigate('MainTabs', { screen: tab });

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
+import { usePatientScope } from '../hooks/usePatientScope';
 import { getMessages, sendMessage, MessageOut } from '../api/client';
 import { COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
@@ -20,7 +21,8 @@ import { useToast } from '../context/ToastContext';
 import { MessageSquare } from 'lucide-react-native';
 
 export default function MessagesScreen() {
-  const { patientId } = useAuth();
+  const { userId } = useAuth();
+  const { patientId, patientName, isOwn } = usePatientScope();
   const navigation = useNavigation();
   const toast = useToast();
   const [messages, setMessages] = useState<MessageOut[]>([]);
@@ -81,7 +83,7 @@ export default function MessagesScreen() {
           <Text style={styles.backLink}>‹ Back</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.title}>Messages</Text>
+      <Text style={styles.title}>{isOwn ? 'Messages' : `${patientName}`}</Text>
       {loading && messages.length === 0 ? (
         <View style={styles.centerFill}>
           <ActivityIndicator color={COLORS.teal} />
@@ -99,7 +101,11 @@ export default function MessagesScreen() {
             <EmptyState icon={MessageSquare} title="No messages yet" description="Start the conversation with your dermatologist." />
           }
           renderItem={({ item }) => {
-            const mine = item.sender_role === 'patient';
+            // Was `item.sender_role === 'patient'` -- wrong for ANY non-patient
+            // viewer (a dermatologist would see every message, including their
+            // own replies, rendered as "theirs"). "mine" means "did I send
+            // this", which is about the viewer's identity, not a fixed role.
+            const mine = item.sender_id === userId;
             return (
               <View style={[styles.bubbleRow, mine ? styles.bubbleRowMine : styles.bubbleRowTheirs]}>
                 <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
