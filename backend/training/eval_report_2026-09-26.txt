@@ -1,0 +1,72 @@
+
+==================================================
+  Acne Detection (YOLOv8)
+==================================================
+Ultralytics YOLOv8.2.48 🚀 Python-3.12.10 torch-2.3.1+cpu CPU (Intel Core(TM) Ultra 7 255H)
+Model summary (fused): 168 layers, 3006818 parameters, 0 gradients, 8.1 GFLOPs
+[34m[1mval: [0mScanning C:\Users\VarunChaudhari\my-projects\dermato\dataset\Acne.v21i.yolo26\test\labels.cache... 92 images, 0 backgrounds, 0 corrupt: 100%|##########| 92/92 [00:00<?, ?it/s][34m[1mval: [0mScanning C:\Users\VarunChaudhari\my-projects\dermato\dataset\Acne.v21i.yolo26\test\labels.cache... 92 images, 0 backgrounds, 0 corrupt: 100%|##########| 92/92 [00:00<?, ?it/s]
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):   0%|          | 0/6 [00:00<?, ?it/s]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  17%|#6        | 1/6 [00:05<00:28,  5.78s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  33%|###3      | 2/6 [00:11<00:23,  5.83s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  50%|#####     | 3/6 [00:19<00:20,  6.94s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  67%|######6   | 4/6 [00:27<00:14,  7.03s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  83%|########3 | 5/6 [00:32<00:06,  6.58s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|##########| 6/6 [00:34<00:00,  5.07s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|##########| 6/6 [00:34<00:00,  5.83s/it]
+                   all         92        923      0.214      0.197      0.138      0.048
+Speed: 4.0ms preprocess, 359.1ms inference, 0.0ms loss, 2.3ms postprocess per image
+Results saved to [1mruns\detect\val8[0m
+  mAP50      : 0.1379
+  mAP50-95   : 0.0480
+  Precision  : 0.2137
+  Recall     : 0.1974
+
+  Per-class AP50:
+    blackheads          : 0.0039
+    dark spot           : 0.2161
+    nodules             : 0.0600
+    papules             : 0.1965
+    pustules            : 0.2616
+    whiteheads          : 0.0895
+
+==================================================
+  Face Skin Problems (YOLOv8)
+==================================================
+Ultralytics YOLOv8.2.48 🚀 Python-3.12.10 torch-2.3.1+cpu CPU (Intel Core(TM) Ultra 7 255H)
+Model summary (fused): 168 layers, 11129454 parameters, 0 gradients, 28.5 GFLOPs
+[34m[1mval: [0mScanning C:\Users\VarunChaudhari\my-projects\dermato\dataset\Face Skin Problems.v1i.yolo26\test\labels.cache... 61 images, 0 backgrounds, 0 corrupt: 100%|##########| 61/61 [00:00<?, ?it/s][34m[1mval: [0mScanning C:\Users\VarunChaudhari\my-projects\dermato\dataset\Face Skin Problems.v1i.yolo26\test\labels.cache... 61 images, 0 backgrounds, 0 corrupt: 100%|##########| 61/61 [00:00<?, ?it/s]
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):   0%|          | 0/4 [00:00<?, ?it/s]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  25%|##5       | 1/4 [00:09<00:28,  9.60s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  50%|#####     | 2/4 [00:30<00:32, 16.17s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95):  75%|#######5  | 3/4 [00:51<00:18, 18.22s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|##########| 4/4 [01:07<00:00, 17.34s/it]                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100%|##########| 4/4 [01:07<00:00, 16.76s/it]
+                   all         61       1209      0.154      0.184      0.116      0.043
+Speed: 4.1ms preprocess, 1034.2ms inference, 0.0ms loss, 41.1ms postprocess per image
+Results saved to [1mruns\detect\val9[0m
+  mAP50      : 0.1165
+  mAP50-95   : 0.0430
+  Precision  : 0.1536
+  Recall     : 0.1844
+
+  Per-class AP50:
+    Acne                : 0.1621
+    Blackheads          : 0.0253
+    Dark-Spots          : 0.1024
+    Dry-Skin            : 0.0372
+    Enlarged-Pores      : 0.1092
+    Eyebags             : 0.2857
+    Oily-Skin           : 0.2447
+    Skin-Redness        : 0.0380
+    Whiteheads          : 0.0205
+    Wrinkles            : 0.1395
+
+==================================================
+  Acne Severity Classifier (EfficientNet-B0)
+==================================================
+              precision    recall  f1-score   support
+
+       clear       0.81      0.88      0.84        77
+        mild       0.82      0.76      0.79        98
+    moderate       0.55      0.52      0.53        23
+      severe       0.77      0.85      0.81        20
+
+    accuracy                           0.78       218
+   macro avg       0.74      0.75      0.74       218
+weighted avg       0.78      0.78      0.78       218
+
+Confusion Matrix:
+[[68  9  0  0]
+ [16 74  7  1]
+ [ 0  7 12  4]
+ [ 0  0  3 17]]
+
+Done.
