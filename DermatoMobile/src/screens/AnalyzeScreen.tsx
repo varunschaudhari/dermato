@@ -226,11 +226,11 @@ export default function AnalyzeScreen() {
       <TouchableOpacity
         style={[
           styles.button,
-          (!photos.front || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
+          (!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
             styles.buttonDisabled,
         ]}
         onPress={handleAnalyze}
-        disabled={!photos.front || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+        disabled={!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
         accessibilityRole="button"
         accessibilityLabel="Analyze Image"
       >

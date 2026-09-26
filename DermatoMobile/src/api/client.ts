@@ -80,6 +80,7 @@ export function getErrorMessage(err: any, fallback: string): string {
   if (typeof detail === 'string') return detail;
   if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join('; ') || fallback;
   if (detail && typeof detail === 'object' && typeof detail.message === 'string') return detail.message;
+  if (!err?.response && err instanceof Error && err.message) return err.message;
   return fallback;
 }
 

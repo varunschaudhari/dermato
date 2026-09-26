@@ -25,10 +25,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AsyncStorage.getItem('token').then(async (stored) => {
       if (stored) {
-        setToken(stored);
         try {
           const { data } = await getMe();
-          setPatientId(data.patient_id ?? null);
+          // This app only has patient-facing screens (Home/Analyze/History/
+          // Progress all key off patientId) -- a dermatologist or admin token
+          // has patient_id: null and would land on a UI with no working
+          // actions at all, e.g. Analyze silently no-ops on submit. Treat it
+          // the same as an invalid session rather than let them in.
+          if (data.patient_id == null) throw new Error('not a patient account');
+          setToken(stored);
+          setPatientId(data.patient_id);
           setFullName(data.full_name ?? null);
           registerForPushNotifications();
         } catch {
@@ -45,9 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // stores it and hydrates the user's identity the same way either path.
   const loginWithToken = async (accessToken: string) => {
     await AsyncStorage.setItem('token', accessToken);
-    setToken(accessToken);
     const me = await getMe();
-    setPatientId(me.data.patient_id ?? null);
+    if (me.data.patient_id == null) {
+      await AsyncStorage.removeItem('token');
+      throw new Error('This app is for patients. Dermatologists and staff should sign in at dermato.cloud on the web.');
+    }
+    setToken(accessToken);
+    setPatientId(me.data.patient_id);
     setFullName(me.data.full_name ?? null);
     registerForPushNotifications();
   };
