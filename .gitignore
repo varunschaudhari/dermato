@@ -54,6 +54,10 @@ backend/models/pigmentation_severity/*
 backend/models/wrinkle_severity/*
 !backend/models/wrinkle_severity/best.pth
 
+!backend/models/mediapipe/
+backend/models/mediapipe/*
+!backend/models/mediapipe/face_landmarker.task
+
 # Node
 node_modules/
 dist/

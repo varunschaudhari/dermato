@@ -3,6 +3,8 @@ import numpy as np
 from dataclasses import dataclass
 from typing import Optional
 
+from app.services import landmark_detector
+
 _face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 _eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_eye.xml")
 
@@ -62,10 +64,19 @@ def detect_and_calibrate(image: np.ndarray) -> Optional[FaceCalibration]:
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     faces = _face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))
     if len(faces) == 0:
-        return None
-
-    # Largest detected face, in case of multiple/spurious detections
-    x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
+        # Haar cascades reliably miss faces that fill nearly the whole frame
+        # edge-to-edge (confirmed on a real user's photo: zero faces at any
+        # scaleFactor/minNeighbors setting) — mediapipe's FaceLandmarker
+        # handles that framing fine, so it's tried here as a fallback face
+        # box rather than giving up entirely. Still returns None (same as
+        # before) for a genuine no-face photo, e.g. a tight skin-ROI crop.
+        box = landmark_detector.face_box_from_landmarks(image)
+        if box is None:
+            return None
+        x, y, fw, fh = box
+    else:
+        # Largest detected face, in case of multiple/spurious detections
+        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
     scale_cm_per_px = _AVG_FACE_WIDTH_CM / fw
 
     h, w = image.shape[:2]
@@ -85,7 +96,7 @@ def detect_and_calibrate(image: np.ndarray) -> Optional[FaceCalibration]:
     skin = cv2.inRange(ycrcb, _SKIN_YCRCB_LOW, _SKIN_YCRCB_HIGH)
     mask = cv2.bitwise_and(mask, skin)
 
-    _exclude_eyes_and_mouth(mask, gray, x, y, fw, fh)
+    _exclude_eyes_and_mouth(mask, image, gray, x, y, fw, fh)
 
     # Skin-tone masks are speckled pixel-by-pixel; closing small gaps avoids
     # a lesion sitting on a few off-color pixels being excluded by accident.
@@ -95,15 +106,13 @@ def detect_and_calibrate(image: np.ndarray) -> Optional[FaceCalibration]:
     return FaceCalibration(scale_cm_per_px=scale_cm_per_px, skin_mask=mask)
 
 
-def _exclude_eyes_and_mouth(mask: np.ndarray, gray: np.ndarray, x: int, y: int, fw: int, fh: int) -> None:
-    """Cuts eyes/eyebrows and the mouth out of `mask` in place. These are the
-    single biggest source of false "wrinkle"/"pigmentation" detections on a
-    real portrait — eyebrow and eyelid edges are stronger than most real
-    wrinkle lines, and lip color often falls inside the same HSV band as
-    genuine dark spots. Without real facial landmarks, eyes are detected
-    directly (reliable even with a neutral expression); the mouth is
-    estimated proportionally, since Haar's smile cascade needs visible teeth
-    and misses a closed, neutral mouth.
+def _exclude_eyes_and_mouth(mask: np.ndarray, image: np.ndarray, gray: np.ndarray, x: int, y: int, fw: int, fh: int) -> None:
+    """Cuts eyes/eyebrows and the mouth+mustache out of `mask` in place.
+    These are the single biggest source of false "wrinkle"/"pigmentation"
+    detections on a real portrait — eyebrow and eyelid edges are stronger
+    than most real wrinkle lines, and mustache hair/lip color often fall
+    inside the same skin-tone band as genuine dark spots. Eyes are
+    cascade-detected directly (reliable even with a neutral expression).
     """
     face_roi = gray[y:y + fh, x:x + fw]
     eyes = _eye_cascade.detectMultiScale(face_roi, scaleFactor=1.1, minNeighbors=5, minSize=(fw // 10, fh // 10))
@@ -118,11 +127,20 @@ def _exclude_eyes_and_mouth(mask: np.ndarray, gray: np.ndarray, x: int, y: int, 
         ey1 = min(mask.shape[0], y + ey + eh + pad_bot)
         mask[ey0:ey1, ex0:ex1] = 0
 
-    # Mouth: proportional estimate (roughly the lower-third, horizontally
-    # centered) rather than cascade-detected — robust across expressions,
-    # where a smile-only detector would miss a neutral/closed mouth.
-    mx0 = x + int(fw * 0.22)
-    mx1 = x + int(fw * 0.78)
-    my0 = y + int(fh * 0.68)
-    my1 = y + int(fh * 0.95)
+    # Mouth + mustache: mediapipe's FaceLandmarker gives a box anchored to
+    # actual facial landmarks (nose tip, mouth corners, lower lip) — a
+    # mustache sitting right at/above a fixed-fraction guess was the root
+    # cause of a real bug report (mustache measured as pigmentation, lips as
+    # wrinkles; see landmark_detector.py). Falls back to the original
+    # proportional estimate (roughly the lower-third, horizontally centered)
+    # when mediapipe can't find a face — e.g. an extreme angle, or this
+    # module failing to load at all.
+    box = landmark_detector.mouth_mustache_box(image)
+    if box:
+        mx0, my0, mx1, my1 = box
+    else:
+        mx0 = x + int(fw * 0.22)
+        mx1 = x + int(fw * 0.78)
+        my0 = y + int(fh * 0.68)
+        my1 = y + int(fh * 0.95)
     mask[max(0, my0):min(mask.shape[0], my1), max(0, mx0):min(mask.shape[1], mx1)] = 0

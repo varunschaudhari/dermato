@@ -15,6 +15,17 @@ scikit-image==0.23.2
 pandas==2.2.2
 openpyxl==3.1.4
 
+# Facial landmarks (app/services/landmark_detector.py), used to precisely
+# exclude mouth/mustache from the skin_mask in face_detector.py — replaces a
+# fixed-proportion mouth-box guess that let mustache hair/lip edges leak
+# into pigmentation/wrinkle analysis. mediapipe's own declared deps want
+# numpy>=2 and pull in opencv-contrib-python; both are pinned down to the
+# numpy==1.26.4/opencv-python==4.10.0.82 above instead, which is verified
+# working (the resolver's conflict warning here is harmless — opencv's C
+# extensions are source/ABI-compatible across that gap for the functions
+# actually used).
+mediapipe==1.0.1
+
 # ML inference (backend/training/inference.py, loaded by app/api/routes/analysis.py)
 # CPU wheels: pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cpu
 torch==2.3.1
