@@ -20,14 +20,14 @@ import torch
 import torch.nn as nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.utils.data import Dataset, DataLoader, random_split
+from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler, random_split
 from torchvision import transforms
 from PIL import Image
 import timm
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, f1_score
 import numpy as np
 
-DATASET_ROOT = Path("C:/Users/varun.chaudhari/my-projects/dermato/dataset/Classification/Classification")
+DATASET_ROOT = Path(__file__).resolve().parents[2] / "dataset" / "Classification" / "Classification"
 IMAGE_DIR    = DATASET_ROOT / "JPEGImages"
 OUTPUT_DIR   = Path(__file__).parent.parent / "models" / "acne_severity"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -112,20 +112,30 @@ def train(epochs: int, batch: int, lr: float, device_str: str):
     val_ds   = AcneSeverityDataset(IMAGE_DIR, DATASET_ROOT, get_transforms("val"),   split="val")
     print(f"Train: {len(train_ds)} | Val: {len(val_ds)}")
 
-    train_loader = DataLoader(train_ds, batch_size=batch, shuffle=True,  num_workers=4, pin_memory=True)
-    val_loader   = DataLoader(val_ds,   batch_size=batch, shuffle=False, num_workers=4, pin_memory=True)
+    # Oversample moderate/severe so each epoch sees them as often as
+    # clear/mild, rather than relying on loss weighting alone — that was
+    # already tried (see git history) and still left "moderate" at 0.53 F1
+    # (eval_report_2026-09-26.txt), the weakest class by far. Weights come
+    # from this split's actual counts, not the full dataset's.
+    train_labels = [label for _, label in train_ds.samples]
+    class_counts = np.bincount(train_labels, minlength=NUM_CLASSES)
+    class_weights = 1.0 / class_counts
+    sample_weights = [class_weights[label] for label in train_labels]
+    sampler = WeightedRandomSampler(sample_weights, num_samples=len(train_ds), replacement=True)
 
-    # Class weights to handle imbalance (level2 & level3 have fewer samples)
-    counts = [497, 637, 186, 137]
-    total  = sum(counts)
-    weights = torch.tensor([total / c for c in counts], dtype=torch.float).to(device)
+    train_loader = DataLoader(train_ds, batch_size=batch, sampler=sampler, num_workers=4, pin_memory=True)
+    val_loader   = DataLoader(val_ds,   batch_size=batch, shuffle=False,   num_workers=4, pin_memory=True)
 
     model     = build_model(NUM_CLASSES).to(device)
-    criterion = nn.CrossEntropyLoss(weight=weights)
+    criterion = nn.CrossEntropyLoss()
     optimizer = AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
-    best_val_acc = 0.0
+    # Macro F1, not raw accuracy, decides the checkpoint to save: accuracy is
+    # dominated by the 637-image "mild" class and was already high (78%)
+    # while moderate/severe lagged — macro F1 weighs all four classes equally,
+    # which is what oversampling is meant to improve.
+    best_val_f1 = 0.0
 
     for epoch in range(1, epochs + 1):
         # --- Train ---
@@ -146,6 +156,7 @@ def train(epochs: int, batch: int, lr: float, device_str: str):
         # --- Validate ---
         model.eval()
         val_loss, val_correct, val_total = 0.0, 0, 0
+        val_preds, val_labels = [], []
         with torch.no_grad():
             for images, labels in val_loader:
                 images, labels = images.to(device), labels.to(device)
@@ -154,20 +165,23 @@ def train(epochs: int, batch: int, lr: float, device_str: str):
                 val_loss    += loss.item() * images.size(0)
                 val_correct += (outputs.argmax(1) == labels).sum().item()
                 val_total   += images.size(0)
+                val_preds.extend(outputs.argmax(1).cpu().numpy())
+                val_labels.extend(labels.cpu().numpy())
 
         train_acc = train_correct / train_total
         val_acc   = val_correct   / val_total
+        val_f1    = f1_score(val_labels, val_preds, average="macro")
 
         print(f"Epoch {epoch:3d}/{epochs} | "
               f"Train Loss: {train_loss/train_total:.4f} Acc: {train_acc:.4f} | "
-              f"Val Loss: {val_loss/val_total:.4f} Acc: {val_acc:.4f}")
+              f"Val Loss: {val_loss/val_total:.4f} Acc: {val_acc:.4f} MacroF1: {val_f1:.4f}")
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
+        if val_f1 > best_val_f1:
+            best_val_f1 = val_f1
             torch.save(model.state_dict(), OUTPUT_DIR / "best.pth")
-            print(f"  ✓ Saved best model (val acc: {best_val_acc:.4f})")
+            print(f"  [best] Saved model (val macro F1: {best_val_f1:.4f}, val acc: {val_acc:.4f})")
 
-    print(f"\nTraining complete. Best val acc: {best_val_acc:.4f}")
+    print(f"\nTraining complete. Best val macro F1: {best_val_f1:.4f}")
     print(f"Model saved: {OUTPUT_DIR / 'best.pth'}")
 
 
