@@ -43,6 +43,7 @@ export interface AnalyzeResult {
   session_id: number;
   patient_id: number;
   image_url: string;
+  scan_types?: string[] | null;
   model_powered: boolean;
   severity: Record<string, Severity>;
   wsi: Record<string, number | null>;
@@ -159,12 +160,15 @@ export const registerPatient = (payload: RegisterPatientPayload) => api.post('/a
 type PhotoAsset = { uri: string; type: string; name: string };
 
 // The backend always analyzes all four conditions server-side; condition
-// selection in this app is a display filter only (applied in ResultsScreen),
-// mirroring how the web app's AnalyzePage/ResultsPage split that work.
+// selection in ResultsScreen is a display filter only, mirroring how the web
+// app's AnalyzePage/ResultsPage split that work. scanTypes is different: it's
+// what the photo was taken to track, saved on the scan so Before/After only
+// pairs scans of the same type.
 // left/right are optional, same as web's AnalyzePage -- only front is required.
 export const analyzeImage = (
   patientId: number,
   photo: PhotoAsset,
+  scanTypes: string[],
   left?: PhotoAsset | null,
   right?: PhotoAsset | null
 ) => {
@@ -174,6 +178,7 @@ export const analyzeImage = (
   if (left) formData.append('file_left', { uri: left.uri, type: left.type, name: left.name } as any);
   if (right) formData.append('file_right', { uri: right.uri, type: right.type, name: right.name } as any);
   formData.append('patient_id', String(patientId));
+  formData.append('scan_types', scanTypes.join(','));
   return api.post<AnalyzeResult>('/analysis/analyze', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
@@ -201,6 +206,8 @@ export interface SessionOut {
   captured_at: string;
   image_url: string;
   images?: Record<string, string>;
+  // null = untagged (saved before scan types existed) -- counts as every type.
+  scan_types?: string[] | null;
   model_powered?: boolean;
   acne_severity?: Severity;
   pigmentation_severity?: Severity;

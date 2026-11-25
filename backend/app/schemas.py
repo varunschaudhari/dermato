@@ -60,6 +60,9 @@ class SessionOut(BaseModel):
     image_path: str
     image_paths: Optional[dict] = None
     captured_at: datetime
+    # Conditions the patient took this photo to track; None = untagged (scans
+    # saved before this existed), which Before/After treats as every type.
+    scan_types: Optional[list[str]] = None
     acne_params: Optional[dict] = None
     pigmentation_params: Optional[dict] = None
     wrinkle_params: Optional[dict] = None

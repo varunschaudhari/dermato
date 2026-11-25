@@ -35,6 +35,7 @@ import {
 import { computeSkinScoreFromSeverities, computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import BeforeAfterPhotoToggle from '../components/BeforeAfterPhotoToggle';
+import { previousComparableSession, formatScanTypes } from '../utils/scanTypes';
 import { useAuth } from '../context/AuthContext';
 
 type RootStackParamList = {
@@ -363,9 +364,10 @@ export default function ResultsScreen() {
     );
   }, [imageUrl]);
 
-  // The just-completed session is already the last entry; the one before it
-  // is this scan's "before" — same logic as the web app's ResultsPage.
-  const previousSession = sessions.length >= 2 ? sessions[sessions.length - 2] : null;
+  // This scan's "before" is the latest earlier scan of the same type (acne vs
+  // acne, never acne vs pigmentation) — same logic as the web app's
+  // ResultsPage. Looked up by id rather than assuming this scan is last.
+  const previousSession = previousComparableSession(sessions, result.session_id);
 
   const severityToShow = useMemo(
     () => Object.fromEntries(Object.entries(severity).filter(([k]) => selected.includes(k))),
@@ -588,11 +590,15 @@ export default function ResultsScreen() {
             <Images size={18} color="#0d9488" />
             <Text style={styles.cardTitle}>Before &amp; After</Text>
           </View>
-          <Text style={styles.cardSubtitle}>Tap the photo to compare your previous visit and today</Text>
+          <Text style={styles.cardSubtitle}>
+            {result.scan_types?.length
+              ? `Tap the photo to compare with your previous ${formatScanTypes(result.scan_types).toLowerCase()} scan`
+              : 'Tap the photo to compare your previous scan and today'}
+          </Text>
           <BeforeAfterPhotoToggle
             beforeUri={absoluteUrl(previousSession.image_url)}
             afterUri={absoluteUrl(imageUrl)}
-            beforeLabel="Previous visit"
+            beforeLabel={new Date(previousSession.captured_at).toLocaleDateString()}
             afterLabel="Today"
             imageStyle={styles.compareImage}
           />

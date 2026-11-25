@@ -37,6 +37,26 @@ router = APIRouter()
 # table only defines mild/moderate/severe tiers.
 _SEVERITY_ALIAS = {"clear": "mild"}
 
+# What the patient took this photo to track. Every scan is still scored for all
+# four conditions; this only decides which Before/After comparisons it joins.
+SCAN_TYPES = ("acne", "pigmentation", "wrinkle", "pore")
+
+
+def _parse_scan_types(raw: Optional[str]) -> Optional[list[str]]:
+    """'acne,pigmentation' -> ['acne', 'pigmentation'] in canonical order.
+    Missing/blank -> None (untagged, like every scan saved before this field
+    existed), so older app builds that don't send it keep working."""
+    if raw is None or not raw.strip():
+        return None
+    requested = {t.strip().lower() for t in raw.split(",") if t.strip()}
+    unknown = requested - set(SCAN_TYPES)
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown scan type(s): {', '.join(sorted(unknown))}. Allowed: {', '.join(SCAN_TYPES)}",
+        )
+    return [t for t in SCAN_TYPES if t in requested]
+
 
 @router.post("/quality-check")
 async def check_quality(file: UploadFile = File(...)):
@@ -65,11 +85,17 @@ async def analyze_image(
     file_left: Optional[UploadFile] = File(None, description="Left-angle photo — optional, stored for reference only"),
     file_right: Optional[UploadFile] = File(None, description="Right-angle photo — optional, stored for reference only"),
     patient_id: int = Form(...),
+    scan_types: Optional[str] = Form(
+        None, description="Comma-separated conditions this photo tracks: acne, pigmentation, wrinkle, pore"
+    ),
     db=Depends(get_db),
     current_user=Depends(get_current_user),
 ):
     if current_user.role == "patient" and current_user.patient_id != patient_id:
         raise HTTPException(status_code=403, detail="Not authorized to analyze on behalf of this patient")
+
+    # Validated before any image work so a bad value fails fast.
+    parsed_scan_types = _parse_scan_types(scan_types)
 
     patient = to_ns(db.patients.find_one({"_id": patient_id}))
     if not patient:
@@ -224,6 +250,7 @@ async def analyze_image(
         "image_path": filename,
         "image_paths": image_paths,
         "captured_at": datetime.utcnow(),
+        "scan_types": parsed_scan_types,
         "acne_params": acne.__dict__,
         "pigmentation_params": pigmentation.__dict__,
         "wrinkle_params": wrinkle.__dict__,
@@ -267,6 +294,7 @@ async def analyze_image(
         "patient_id": patient_id,
         "image_url": f"/uploads/{filename}",
         "images": {angle: f"/uploads/{p}" for angle, p in image_paths.items()},
+        "scan_types": parsed_scan_types,
         "model_powered": ml_detections is not None,
         "parameters": {
             "acne": acne.__dict__,

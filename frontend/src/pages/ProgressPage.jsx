@@ -19,6 +19,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { computeSkinScoreFromSession, scoreMeta } from '../utils/skinScore'
 import { computeTreatmentProgress } from '../utils/treatmentProgress'
+import { SCAN_TYPES, SCAN_TYPE_LABELS, comparableTypes, sessionsOfType, isUntagged } from '../utils/scanTypes'
 import { LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { BRAND_TEAL, CONDITION_COLORS } from '../lib/colors'
 import PageHeader from '../components/ui/PageHeader'
@@ -599,14 +600,22 @@ export default function ProgressPage() {
     if (target) setActiveTab(target)
   }, [location.hash])
 
-  // null = "default to the two most recent sessions" -- only pinned to
-  // specific indices once the patient actually picks a pair below.
+  // Before/After only pairs scans of the same type (acne vs acne). null type =
+  // default to the latest scan's type; null indices = "the two most recent
+  // scans of that type" -- only pinned once the patient picks a pair below.
+  const [compareType, setCompareType] = useState(null)
   const [compareLeftIdx, setCompareLeftIdx] = useState(null)
   const [compareRightIdx, setCompareRightIdx] = useState(null)
   useEffect(() => {
+    setCompareType(null)
     setCompareLeftIdx(null)
     setCompareRightIdx(null)
   }, [patientId])
+  const selectCompareType = (type) => {
+    setCompareType(type)
+    setCompareLeftIdx(null)
+    setCompareRightIdx(null)
+  }
 
   const [historySearch, setHistorySearch] = useState('')
   const filteredHistorySessions = useMemo(() => {
@@ -656,10 +665,22 @@ export default function ProgressPage() {
     pore: bandScore(s.pore_severity),
   }))
 
-  const effectiveLeftIdx = compareLeftIdx ?? sessions.length - 2
-  const effectiveRightIdx = compareRightIdx ?? sessions.length - 1
-  const compareFirstScore = computeSkinScoreFromSession(sessions[effectiveLeftIdx])
-  const compareLastScore = computeSkinScoreFromSession(sessions[effectiveRightIdx])
+  const availableCompareTypes = comparableTypes(sessions)
+  const latestTypes = sessions[sessions.length - 1]?.scan_types || []
+  const effectiveCompareType = availableCompareTypes.includes(compareType)
+    ? compareType
+    : availableCompareTypes.find((t) => latestTypes.includes(t)) ?? availableCompareTypes[0] ?? null
+  const compareSessions = effectiveCompareType ? sessionsOfType(sessions, effectiveCompareType) : []
+  const anyTagged = sessions.some((s) => !isUntagged(s))
+  const compareOptionLabel = (s) =>
+    new Date(s.captured_at).toLocaleDateString() + (anyTagged && isUntagged(s) ? ' · untagged' : '')
+
+  const effectiveLeftIdx = compareLeftIdx ?? compareSessions.length - 2
+  const effectiveRightIdx = compareRightIdx ?? compareSessions.length - 1
+  const compareLeft = compareSessions[effectiveLeftIdx]
+  const compareRight = compareSessions[effectiveRightIdx]
+  const compareFirstScore = computeSkinScoreFromSession(compareLeft)
+  const compareLastScore = computeSkinScoreFromSession(compareRight)
   const compareDelta = compareFirstScore != null && compareLastScore != null ? compareLastScore - compareFirstScore : null
 
   const deleteMutation = useMutation({
@@ -776,37 +797,75 @@ export default function ProgressPage() {
 
                 {sessions.length >= 2 && (
                   <Card>
-                    <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+                    <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
                       <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
                         <Images className="w-5 h-5 text-brand-600" />
                         Before vs. After
                       </h2>
-                      <div className="flex items-center gap-2 text-xs">
-                        <select
-                          value={effectiveLeftIdx}
-                          onChange={(e) => setCompareLeftIdx(Number(e.target.value))}
-                          className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
-                        >
-                          {sessions.map((s, i) => (
-                            <option key={s.id} value={i} disabled={i === effectiveRightIdx}>
-                              {new Date(s.captured_at).toLocaleDateString()}
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-gray-400">vs.</span>
-                        <select
-                          value={effectiveRightIdx}
-                          onChange={(e) => setCompareRightIdx(Number(e.target.value))}
-                          className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
-                        >
-                          {sessions.map((s, i) => (
-                            <option key={s.id} value={i} disabled={i === effectiveLeftIdx}>
-                              {new Date(s.captured_at).toLocaleDateString()}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      {compareLeft && compareRight && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <select
+                            value={effectiveLeftIdx}
+                            onChange={(e) => setCompareLeftIdx(Number(e.target.value))}
+                            aria-label="Before scan"
+                            className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
+                          >
+                            {compareSessions.map((s, i) => (
+                              <option key={s.id} value={i} disabled={i === effectiveRightIdx}>
+                                {compareOptionLabel(s)}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-gray-400">vs.</span>
+                          <select
+                            value={effectiveRightIdx}
+                            onChange={(e) => setCompareRightIdx(Number(e.target.value))}
+                            aria-label="After scan"
+                            className="border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-lg px-2 py-1"
+                          >
+                            {compareSessions.map((s, i) => (
+                              <option key={s.id} value={i} disabled={i === effectiveLeftIdx}>
+                                {compareOptionLabel(s)}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </div>
+
+                    <div role="group" aria-label="Compare scans of type" className="flex flex-wrap gap-2 mb-4">
+                      {SCAN_TYPES.map((type) => {
+                        const count = sessionsOfType(sessions, type).length
+                        const enabled = count >= 2
+                        const active = type === effectiveCompareType
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => selectCompareType(type)}
+                            disabled={!enabled}
+                            aria-pressed={active}
+                            title={enabled ? undefined : `Needs at least 2 ${SCAN_TYPE_LABELS[type].toLowerCase()} scans`}
+                            className={`px-3 py-1 rounded-full text-xs font-medium border transition ${
+                              active
+                                ? 'bg-brand-600 border-brand-600 text-white'
+                                : enabled
+                                  ? 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-brand-400'
+                                  : 'bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                            }`}
+                          >
+                            {SCAN_TYPE_LABELS[type]} ({count})
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {!compareLeft || !compareRight ? (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">
+                        No two scans of the same type yet. Scan the same area again with the same type selected to compare them here.
+                      </p>
+                    ) : (
+                    <>
                     <div className="relative">
                       {compareDelta != null && compareDelta !== 0 && (
                         <div
@@ -824,12 +883,34 @@ export default function ProgressPage() {
                         </div>
                       )}
                       <ReactCompareImage
-                        leftImage={sessions[effectiveLeftIdx].image_url}
-                        rightImage={sessions[effectiveRightIdx].image_url}
-                        leftImageLabel={new Date(sessions[effectiveLeftIdx].captured_at).toLocaleDateString()}
-                        rightImageLabel={new Date(sessions[effectiveRightIdx].captured_at).toLocaleDateString()}
+                        leftImage={compareLeft.image_url}
+                        rightImage={compareRight.image_url}
+                        leftImageLabel={new Date(compareLeft.captured_at).toLocaleDateString()}
+                        rightImageLabel={new Date(compareRight.captured_at).toLocaleDateString()}
                       />
                     </div>
+                    {(compareLeft[`${effectiveCompareType}_severity`] || compareRight[`${effectiveCompareType}_severity`]) && (
+                      <div className="flex items-center justify-center gap-2 flex-wrap mt-3 text-xs text-gray-600 dark:text-gray-300">
+                        <span className="font-medium">{SCAN_TYPE_LABELS[effectiveCompareType]}:</span>
+                        {[compareLeft, compareRight].map((s, i) => {
+                          const sev = s[`${effectiveCompareType}_severity`]
+                          return (
+                            <span key={s.id} className="inline-flex items-center gap-2">
+                              {i === 1 && <ArrowRight className="w-3.5 h-3.5 text-gray-400" />}
+                              {sev ? (
+                                <Badge color={SEVERITY[sev]?.color} icon={SEVERITY[sev]?.icon}>
+                                  {sev.charAt(0).toUpperCase() + sev.slice(1)}
+                                </Badge>
+                              ) : (
+                                <span className="text-gray-400">n/a</span>
+                              )}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
+                    </>
+                    )}
                   </Card>
                 )}
               </>

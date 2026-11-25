@@ -61,6 +61,52 @@ def test_analyze_with_left_and_right_angles(client, auth_headers):
     assert set(sessions[0]["images"].keys()) == {"front", "left", "right"}
 
 
+def test_analyze_saves_scan_types_in_canonical_order(client, auth_headers):
+    patient_id = _create_patient(client, auth_headers)
+    files = {"file": ("front.jpg", io.BytesIO(_fake_jpeg_bytes()), "image/jpeg")}
+    res = client.post(
+        "/api/analysis/analyze",
+        files=files,
+        data={"patient_id": patient_id, "scan_types": "Pigmentation, acne"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 200
+    assert res.json()["scan_types"] == ["acne", "pigmentation"]
+
+    sessions = client.get(f"/api/sessions/patient/{patient_id}", headers=auth_headers).json()
+    assert sessions[0]["scan_types"] == ["acne", "pigmentation"]
+
+
+def test_analyze_without_scan_types_is_untagged(client, auth_headers):
+    # Older app builds don't send scan_types — they must keep working, and
+    # their scans are stored untagged like every scan from before the field.
+    patient_id = _create_patient(client, auth_headers)
+    files = {"file": ("front.jpg", io.BytesIO(_fake_jpeg_bytes()), "image/jpeg")}
+    res = client.post(
+        "/api/analysis/analyze", files=files, data={"patient_id": patient_id}, headers=auth_headers
+    )
+    assert res.status_code == 200
+    assert res.json()["scan_types"] is None
+
+    sessions = client.get(f"/api/sessions/patient/{patient_id}", headers=auth_headers).json()
+    assert sessions[0]["scan_types"] is None
+
+
+def test_analyze_rejects_unknown_scan_type(client, auth_headers):
+    patient_id = _create_patient(client, auth_headers)
+    files = {"file": ("front.jpg", io.BytesIO(_fake_jpeg_bytes()), "image/jpeg")}
+    res = client.post(
+        "/api/analysis/analyze",
+        files=files,
+        data={"patient_id": patient_id, "scan_types": "acne,eczema"},
+        headers=auth_headers,
+    )
+    assert res.status_code == 422
+    assert "eczema" in res.json()["detail"]
+    sessions = client.get(f"/api/sessions/patient/{patient_id}", headers=auth_headers).json()
+    assert sessions == []
+
+
 def test_analyze_requires_valid_image(client, auth_headers):
     patient_id = _create_patient(client, auth_headers)
     files = {"file": ("front.txt", io.BytesIO(b"not an image"), "text/plain")}

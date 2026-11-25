@@ -21,6 +21,7 @@ import {
 } from '../api/client';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import { computeTreatmentProgress } from '../utils/treatmentProgress';
+import { SCAN_TYPES, ScanType, comparableTypes, sessionsOfType, isUntagged } from '../utils/scanTypes';
 import ErrorState from '../components/ErrorState';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
 import EmptyState from '../components/EmptyState';
@@ -129,21 +130,73 @@ function SkinHistoryCard({ patientId, history, onSaved }: { patientId: number; h
 }
 
 function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
+  // Only scans of the same type are paired (acne vs acne). null type = default
+  // to the latest scan's type; null indices = first vs latest of that type.
+  const [type, setType] = useState<ScanType | null>(null);
   const [leftIdx, setLeftIdx] = useState<number | null>(null);
   const [rightIdx, setRightIdx] = useState<number | null>(null);
-  const effectiveLeft = leftIdx ?? 0;
-  const effectiveRight = rightIdx ?? sessions.length - 1;
-  const left = sessions[effectiveLeft];
-  const right = sessions[effectiveRight];
+
+  const available = comparableTypes(sessions);
+  const latestTypes = sessions[sessions.length - 1]?.scan_types || [];
+  const effectiveType: ScanType | null =
+    type && available.includes(type)
+      ? type
+      : available.find((t) => latestTypes.includes(t)) ?? available[0] ?? null;
+  const typed = effectiveType ? sessionsOfType(sessions, effectiveType) : [];
+  const anyTagged = sessions.some((s) => !isUntagged(s));
+  const chipLabel = (s: SessionOut) =>
+    new Date(s.captured_at).toLocaleDateString() + (anyTagged && isUntagged(s) ? ' · untagged' : '');
+
+  // Indices point into `typed`; fall back to defaults if they no longer fit
+  // (e.g. the list changed under a pinned selection).
+  const effectiveLeft = leftIdx != null && leftIdx < typed.length ? leftIdx : 0;
+  const effectiveRight = rightIdx != null && rightIdx < typed.length ? rightIdx : typed.length - 1;
+  const left = typed[effectiveLeft];
+  const right = typed[effectiveRight];
+
+  const selectType = (t: ScanType) => {
+    setType(t);
+    setLeftIdx(null);
+    setRightIdx(null);
+  };
 
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>Before &amp; After</Text>
-      <Text style={styles.cardSubtitle}>Drag the photo to compare any two visits</Text>
+      <Text style={styles.cardSubtitle}>Compare two scans of the same type</Text>
 
+      <View style={styles.typeTabsRow}>
+        {SCAN_TYPES.map((t) => {
+          const count = sessionsOfType(sessions, t).length;
+          const enabled = count >= 2;
+          const active = t === effectiveType;
+          return (
+            <TouchableOpacity
+              key={t}
+              style={[styles.compareChip, active && styles.compareChipActive, !enabled && styles.typeTabDisabled]}
+              onPress={() => selectType(t)}
+              disabled={!enabled}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active, disabled: !enabled }}
+              accessibilityLabel={`${CONDITION_LABELS[t]}, ${count} scans`}
+            >
+              <Text style={[styles.compareChipText, active && styles.compareChipTextActive, !enabled && styles.typeTabTextDisabled]}>
+                {CONDITION_LABELS[t]} ({count})
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {!effectiveType || !left || !right || effectiveLeft === effectiveRight ? (
+        <Text style={[styles.emptyText, { marginTop: 10 }]}>
+          No two scans of the same type yet. Scan the same area again with the same type selected to compare them here.
+        </Text>
+      ) : (
+      <>
       <Text style={styles.compareChipsLabel}>Before</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
-        {sessions.map((s, i) => (
+        {typed.map((s, i) => (
           <TouchableOpacity
             key={s.id}
             style={[styles.compareChip, i === effectiveLeft && styles.compareChipActive]}
@@ -153,7 +206,7 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
             accessibilityLabel={`Compare from ${new Date(s.captured_at).toLocaleDateString()}`}
           >
             <Text style={[styles.compareChipText, i === effectiveLeft && styles.compareChipTextActive]}>
-              {new Date(s.captured_at).toLocaleDateString()}
+              {chipLabel(s)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -161,7 +214,7 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
 
       <Text style={styles.compareChipsLabel}>After</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
-        {sessions.map((s, i) => (
+        {typed.map((s, i) => (
           <TouchableOpacity
             key={s.id}
             style={[styles.compareChip, i === effectiveRight && styles.compareChipActive]}
@@ -171,7 +224,7 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
             accessibilityLabel={`Compare to ${new Date(s.captured_at).toLocaleDateString()}`}
           >
             <Text style={[styles.compareChipText, i === effectiveRight && styles.compareChipTextActive]}>
-              {new Date(s.captured_at).toLocaleDateString()}
+              {chipLabel(s)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -184,6 +237,30 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
         afterLabel={new Date(right.captured_at).toLocaleDateString()}
         imageStyle={styles.compareImage}
       />
+
+      {(left[`${effectiveType}_severity` as keyof SessionOut] || right[`${effectiveType}_severity` as keyof SessionOut]) && (
+        <View style={styles.compareSeverityRow}>
+          <Text style={styles.compareSeverityLabel}>{CONDITION_LABELS[effectiveType]}:</Text>
+          {[left, right].map((s, i) => {
+            const sev = s[`${effectiveType}_severity` as keyof SessionOut] as string | undefined;
+            const meta = sev ? SEVERITY_META[sev] : undefined;
+            return (
+              <View key={s.id} style={styles.compareSeverityItem}>
+                {i === 1 && <ArrowRight size={12} color={COLORS.mutedGray} />}
+                {meta ? (
+                  <View style={[styles.severityPill, { backgroundColor: meta.bg }]}>
+                    <Text style={[styles.severityPillText, { color: meta.color }]}>{meta.label}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.compareSeverityLabel}>n/a</Text>
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+      </>
+      )}
     </View>
   );
 }
@@ -545,6 +622,12 @@ const styles = StyleSheet.create({
   compareChipActive: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
   compareChipText: { fontSize: 11, color: COLORS.heading, fontWeight: '600' },
   compareChipTextActive: { color: '#fff' },
+  typeTabsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  typeTabDisabled: { borderColor: COLORS.border, backgroundColor: '#f9fafb' },
+  typeTabTextDisabled: { color: COLORS.mutedGray },
+  compareSeverityRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: 6, marginTop: 10 },
+  compareSeverityItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  compareSeverityLabel: { fontSize: 12, color: COLORS.secondaryText, fontWeight: '600' },
   adherencePrompt: { marginTop: 8, width: '100%' },
   adherenceLabel: { fontSize: 11, color: COLORS.mutedGray, marginBottom: 6 },
   adherenceRow: { flexDirection: 'row', gap: 6 },

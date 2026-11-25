@@ -8,7 +8,8 @@ import { useAuth } from '../context/AuthContext';
 import { usePatientScope } from '../hooks/usePatientScope';
 import { useSelectedPatient } from '../context/SelectedPatientContext';
 import { analyzeImage, checkPhotoQuality, getErrorMessage } from '../api/client';
-import { COLORS } from '../constants';
+import { COLORS, CONDITION_LABELS } from '../constants';
+import { SCAN_TYPES, ScanType } from '../utils/scanTypes';
 import FormError from '../components/FormError';
 import PatientPickerField from '../components/PatientPickerField';
 
@@ -45,6 +46,7 @@ export default function AnalyzeScreen() {
   // are optional supplementary context, same as the web app's treatment of them.
   const [qualityStatus, setQualityStatus] = useState<QualityStatus>('idle');
   const [qualityMessage, setQualityMessage] = useState('');
+  const [scanTypes, setScanTypes] = useState<ScanType[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { logout, fullName } = useAuth();
@@ -107,11 +109,18 @@ export default function AnalyzeScreen() {
     }
   };
 
+  const toggleScanType = (type: ScanType) => {
+    setScanTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  };
+
+  // 'idle' quality here means the precheck itself was inconclusive (e.g.
+  // network hiccup), not that the photo failed — only a confirmed 'failed' or
+  // a check still in flight should block submission.
+  const canAnalyze =
+    !!photos.front && !!patientId && scanTypes.length > 0 && !loading && qualityStatus !== 'checking' && qualityStatus !== 'failed';
+
   const handleAnalyze = async () => {
-    // 'idle' here means the precheck itself was inconclusive (e.g. network
-    // hiccup), not that the photo failed — only a confirmed 'failed' or a
-    // check still in flight should block submission.
-    if (!photos.front || !patientId || qualityStatus === 'checking' || qualityStatus === 'failed') return;
+    if (!canAnalyze || !photos.front || !patientId) return;
     setLoading(true);
     setError('');
     try {
@@ -119,6 +128,7 @@ export default function AnalyzeScreen() {
       const { data } = await analyzeImage(
         patientId,
         toPhotoPayload(photos.front),
+        scanTypes,
         photos.left ? toPhotoPayload(photos.left) : undefined,
         photos.right ? toPhotoPayload(photos.right) : undefined
       );
@@ -156,6 +166,29 @@ export default function AnalyzeScreen() {
               <Text style={styles.forPatientBannerText}>Analyzing for {patientName}</Text>
             </View>
           )}
+
+          <View style={styles.typeBox}>
+            <Text style={styles.typeTitle}>What is this photo for?</Text>
+            <Text style={styles.typeHint}>Pick all that apply. Before &amp; After only compares photos of the same type.</Text>
+            <View style={styles.typeRow}>
+              {SCAN_TYPES.map((type) => {
+                const active = scanTypes.includes(type);
+                return (
+                  <TouchableOpacity
+                    key={type}
+                    style={[styles.typeChip, active && styles.typeChipActive]}
+                    onPress={() => toggleScanType(type)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: active }}
+                    accessibilityLabel={`${CONDITION_LABELS[type]} photo`}
+                  >
+                    {active && <Check size={12} color="#fff" />}
+                    <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>{CONDITION_LABELS[type]}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           <View style={styles.tipsBox}>
             <Lightbulb size={16} color="#d97706" style={styles.tipsIcon} />
@@ -246,18 +279,17 @@ export default function AnalyzeScreen() {
           {error ? <FormError message={error} /> : null}
 
           <TouchableOpacity
-            style={[
-              styles.button,
-              (!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed') &&
-                styles.buttonDisabled,
-            ]}
+            style={[styles.button, !canAnalyze && styles.buttonDisabled]}
             onPress={handleAnalyze}
-            disabled={!photos.front || !patientId || loading || qualityStatus === 'checking' || qualityStatus === 'failed'}
+            disabled={!canAnalyze}
             accessibilityRole="button"
             accessibilityLabel="Analyze Image"
           >
             {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Analyze Image</Text>}
           </TouchableOpacity>
+          {photos.front && scanTypes.length === 0 && (
+            <Text style={styles.typeMissing}>Choose what this photo is for to continue.</Text>
+          )}
         </>
       )}
     </ScrollView>
@@ -274,6 +306,15 @@ const styles = StyleSheet.create({
   pickerGateTitle: { fontSize: 14, fontWeight: '600', color: COLORS.heading, marginBottom: 10 },
   forPatientBanner: { backgroundColor: COLORS.tealSoft, borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, marginBottom: 16 },
   forPatientBannerText: { color: COLORS.teal, fontSize: 13, fontWeight: '600' },
+  typeBox: { backgroundColor: '#fff', borderWidth: 1, borderColor: COLORS.divider, borderRadius: 12, padding: 12, marginBottom: 16 },
+  typeTitle: { fontSize: 14, fontWeight: '600', color: COLORS.heading },
+  typeHint: { fontSize: 12, color: COLORS.secondaryText, marginTop: 2, marginBottom: 10 },
+  typeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  typeChip: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7 },
+  typeChipActive: { backgroundColor: COLORS.teal },
+  typeChipText: { fontSize: 13, fontWeight: '600', color: COLORS.teal },
+  typeChipTextActive: { color: '#fff' },
+  typeMissing: { fontSize: 12, color: COLORS.secondaryText, textAlign: 'center', marginTop: 8 },
   tipsBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: '#fffbeb', borderWidth: 1, borderColor: '#fde68a', borderRadius: 12, padding: 12, marginBottom: 16 },
   tipsIcon: { marginTop: 2 },
   tipsTextWrap: { flex: 1, gap: 3 },

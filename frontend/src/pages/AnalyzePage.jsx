@@ -12,6 +12,7 @@ import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { compressImage } from '../utils/compressImage'
 import { assessVideoFrame, qualityHint } from '../utils/photoQuality'
+import { SCAN_TYPES, SCAN_TYPE_LABELS, formatScanTypes } from '../utils/scanTypes'
 import PageHeader from '../components/ui/PageHeader'
 import Card from '../components/ui/Card'
 import Button from '../components/ui/Button'
@@ -96,6 +97,7 @@ export default function AnalyzePage() {
   const [compressing, setCompressing] = useState(false)
   const [justCaptured, setJustCaptured] = useState(false)
   const [patientId, setPatientId] = useState(isPatient ? String(user.patient_id) : '')
+  const [scanTypes, setScanTypes] = useState([])
   const [loading, setLoading] = useState(false)
   const [progress, setProgress] = useState(0)
   const [analysisStage, setAnalysisStage] = useState(0)
@@ -352,8 +354,12 @@ export default function AnalyzePage() {
     noKeyboard: true,
   })
 
+  const toggleScanType = (type) => {
+    setScanTypes((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]))
+  }
+
   const handleAnalyze = async () => {
-    if (!file || !patientId) return
+    if (!file || !patientId || scanTypes.length === 0) return
     setLoading(true)
     setError('')
     setIsQualityError(false)
@@ -365,6 +371,7 @@ export default function AnalyzePage() {
       if (photos.left?.file) formData.append('file_left', photos.left.file)
       if (photos.right?.file) formData.append('file_right', photos.right.file)
       formData.append('patient_id', patientId)
+      formData.append('scan_types', scanTypes.join(','))
       analysisStageIntervalRef.current = setInterval(() => {
         setAnalysisStage((prev) => Math.min(prev + 1, ANALYSIS_STAGES.length - 1))
       }, 1200)
@@ -438,6 +445,35 @@ export default function AnalyzePage() {
           )}
         </Card>
       )}
+
+      <Card className="mb-5">
+        <p id="scan-type-label" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          What is this photo for?
+        </p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-3">
+          Pick all that apply. Before &amp; After only compares photos of the same type.
+        </p>
+        <div role="group" aria-labelledby="scan-type-label" className="flex flex-wrap gap-2">
+          {SCAN_TYPES.map((type) => {
+            const active = scanTypes.includes(type)
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => toggleScanType(type)}
+                aria-pressed={active}
+                className={`px-3.5 py-1.5 rounded-full text-sm font-medium border transition ${
+                  active
+                    ? 'bg-brand-600 border-brand-600 text-white'
+                    : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-brand-400'
+                }`}
+              >
+                {SCAN_TYPE_LABELS[type]}
+              </button>
+            )
+          })}
+        </div>
+      </Card>
 
       <Card className="mb-5 bg-amber-50/60 dark:bg-amber-900/10 border-amber-100 dark:border-amber-900/40">
         <div className="flex items-start gap-2.5">
@@ -727,15 +763,22 @@ export default function AnalyzePage() {
       )}
 
       {file && !loading && (
-        <Button
-          onClick={() => setShowReview(true)}
-          disabled={!patientId}
-          icon={ScanFace}
-          fullWidth
-          className="mt-5 py-3"
-        >
-          Analyze Image
-        </Button>
+        <>
+          <Button
+            onClick={() => setShowReview(true)}
+            disabled={!patientId || scanTypes.length === 0}
+            icon={ScanFace}
+            fullWidth
+            className="mt-5 py-3"
+          >
+            Analyze Image
+          </Button>
+          {scanTypes.length === 0 && (
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+              Choose what this photo is for to continue.
+            </p>
+          )}
+        </>
       )}
 
       {showReview && (
@@ -770,6 +813,9 @@ export default function AnalyzePage() {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-gray-600 dark:text-gray-300 mb-2 text-center">
+              Tracking: <span className="font-semibold">{formatScanTypes(scanTypes)}</span>
+            </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-4 text-center">
               This estimates severity to help you decide next steps. It does not diagnose melanoma, cancer, or any medical condition.
             </p>

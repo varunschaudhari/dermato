@@ -5,6 +5,7 @@ import ReactCompareImage from 'react-compare-image'
 import { Cpu, FlaskConical, ScanFace, TrendingUp, Home, Pill, Stethoscope, FileText, ChevronDown, ChevronUp, ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, CalendarPlus, Images, Share2, StickyNote, CalendarClock, Sparkles, Waves, Palette, CircleDot } from 'lucide-react'
 import { getPatientSessions, getTreatmentPlans, updatePatientNote, getConditionEducation } from '../services/api'
 import { computeSkinScoreFromSeverities, scoreMeta } from '../utils/skinScore'
+import { previousComparableSession, formatScanTypes } from '../utils/scanTypes'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { DETECTION_COLORS, CONDITION_COLORS } from '../lib/colors'
@@ -340,15 +341,18 @@ export default function ResultsPage() {
   const imageUrl = state.imageUrl
   const detections = mlDetections?.detections ?? []
 
-  // The just-created session is already the last entry here; the one before
-  // it is this scan's "before" photo, so a returning patient sees whether
-  // their treatment worked without navigating to Progress separately.
+  // This scan's "before" photo is the latest earlier scan of the same type
+  // (acne vs acne, never acne vs pigmentation), so a returning patient sees
+  // whether their treatment worked without navigating to Progress separately.
+  // Looked up by id, so a cached list from before this scan was saved shows
+  // nothing until the refetch lands instead of pairing the wrong photos.
   const { data: patientSessions = [], isLoading: patientSessionsLoading } = useQuery({
     queryKey: ['sessions', String(patientId)],
     queryFn: () => getPatientSessions(patientId).then((r) => r.data),
     enabled: !!patientId,
   })
-  const previousSession = patientSessions.length >= 2 ? patientSessions[patientSessions.length - 2] : null
+  const previousSession = sessionId ? previousComparableSession(patientSessions, sessionId) : null
+  const currentScanTypes = state.results.scan_types
 
   const { data: education = [] } = useQuery({
     queryKey: ['condition-education'],
@@ -558,14 +562,19 @@ export default function ResultsPage() {
 
       {previousSession && imageUrl && (
         <Card>
-          <h2 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
             <Images className="w-5 h-5 text-brand-600" />
             Before vs. After
           </h2>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 mb-4">
+            {currentScanTypes?.length
+              ? `Compared with your previous ${formatScanTypes(currentScanTypes).toLowerCase()} scan`
+              : 'Compared with your previous scan'}
+          </p>
           <ReactCompareImage
             leftImage={previousSession.image_url}
             rightImage={imageUrl}
-            leftImageLabel="Previous visit"
+            leftImageLabel={new Date(previousSession.captured_at).toLocaleDateString()}
             rightImageLabel="Today"
           />
         </Card>
