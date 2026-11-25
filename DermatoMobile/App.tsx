@@ -25,6 +25,7 @@ import MessagesScreen from './src/screens/MessagesScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import AppointmentsScreen from './src/screens/AppointmentsScreen';
+import UpdatePrompt from './src/components/UpdatePrompt';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -166,6 +167,7 @@ export default function App() {
             <NavigationContainer>
               <RootNavigator />
             </NavigationContainer>
+            <UpdatePrompt />
           </SelectedPatientProvider>
         </AuthProvider>
       </ToastProvider>

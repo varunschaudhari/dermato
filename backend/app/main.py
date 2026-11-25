@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
-from app.api.routes import analysis, analytics, appointments, auth, education, notifications, remedies, sessions, patients
+from app.api.routes import analysis, analytics, app_version, appointments, auth, education, notifications, remedies, sessions, patients
 from app.core.config import settings
 from app.core.limiter import limiter
 from app.core.security import get_current_user, hash_password, require_role
@@ -56,6 +56,8 @@ os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+# Public: the mobile app checks for updates before anyone has logged in.
+app.include_router(app_version.router, prefix="/api/app", tags=["App"])
 app.include_router(
     analysis.router,
     prefix="/api/analysis",

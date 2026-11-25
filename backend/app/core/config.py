@@ -52,6 +52,15 @@ class Settings(BaseSettings):
     # dev -- pushes are logged to the console instead of sent, same as SMTP_HOST.
     FIREBASE_CREDENTIALS_PATH: str = ""
 
+    # Mobile app updates (app/api/routes/app_version.py): the highest-versioned
+    # GitHub release on this repo with an .apk attached is what the app offers
+    # as its update, so publishing a release is all it takes to ship one.
+    APP_RELEASES_REPO: str = "varunschaudhari/dermato"
+    APP_RELEASE_CACHE_SECONDS: int = 600
+    # App versions below this get a blocking "update required" prompt (e.g.
+    # after an API change old builds can't handle). Empty = never force.
+    ANDROID_MIN_SUPPORTED_VERSION: str = ""
+
     # Comma-separated list of allowed CORS origins
     CORS_ORIGINS: str = "http://localhost:3000"
 

@@ -144,6 +144,18 @@ export const forgotPassword = (email: string) => api.post('/auth/forgot-password
 
 export const registerPushToken = (token: string) => api.post('/auth/me/push-token', { token });
 
+// Public, no login needed -- see backend/app/api/routes/app_version.py.
+export interface AppVersionInfo {
+  platform: 'android';
+  latest_version: string | null;
+  download_url: string | null;
+  release_url: string | null;
+  release_name: string | null;
+  min_supported_version: string | null;
+}
+
+export const getAppVersionInfo = () => api.get<AppVersionInfo>('/app/version', { timeout: 10000 });
+
 export const clearPushToken = () => api.delete('/auth/me/push-token');
 
 export interface RegisterPatientPayload {
