@@ -13,7 +13,7 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { usePatientScope } from '../hooks/usePatientScope';
-import { getMessages, sendMessage, MessageOut } from '../api/client';
+import { getMessages, sendMessage, markPatientMessagesRead, MessageOut } from '../api/client';
 import { COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 import EmptyState from '../components/EmptyState';
@@ -39,6 +39,11 @@ export default function MessagesScreen() {
       const { data } = await getMessages(patientId);
       setMessages(data);
       setError('');
+      // Everything in this thread is now on screen, so it's read -- without
+      // this the inbox's unread dot, the Worklist's "Needs a Reply" and the
+      // unread count stayed stuck. Repeated after every 30s poll so messages
+      // that arrive while the thread is open are cleared too. Best-effort.
+      markPatientMessagesRead(patientId).catch(() => {});
     } catch {
       setError("Couldn't load your messages.");
     } finally {

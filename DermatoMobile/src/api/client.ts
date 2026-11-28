@@ -393,6 +393,10 @@ export const markNotificationRead = (id: number) => api.patch<NotificationOut>(`
 
 export const markAllNotificationsRead = () => api.post('/notifications/read-all');
 
+// Clears the current user's unread "new message" notifications for one
+// patient's thread -- what the Messages inbox's unread counts are built from.
+export const markPatientMessagesRead = (patientId: number) => api.post(`/notifications/read-for-patient/${patientId}`);
+
 export interface DoctorOption {
   id: number;
   full_name: string | null;

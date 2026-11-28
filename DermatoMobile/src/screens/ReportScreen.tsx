@@ -3,7 +3,8 @@ import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, StyleSheet,
 import { RouteProp, useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { ArrowUpCircle, ArrowDownRight, ArrowUpRight, Minus, Share2, ChevronDown, ChevronUp } from 'lucide-react-native';
-import { absoluteUrl, getSession, getTreatmentPlans, updateDoctorNote, SessionOut, TreatmentPlanOut } from '../api/client';
+import { absoluteUrl, getSession, getTreatmentPlans, updateDoctorNote, getErrorMessage, SessionOut, TreatmentPlanOut } from '../api/client';
+import { useToast } from '../context/ToastContext';
 import { CONDITION_LABELS, SEVERITY_META, COLORS } from '../constants';
 import ErrorState from '../components/ErrorState';
 import { useAuth } from '../context/AuthContext';
@@ -63,6 +64,7 @@ export default function ReportScreen() {
   const { sessionId } = route.params;
   const { role } = useAuth();
   const isDoctor = role === 'dermatologist';
+  const toast = useToast();
 
   const [session, setSession] = useState<SessionOut | null>(null);
   const [plans, setPlans] = useState<TreatmentPlanOut[]>([]);
@@ -99,6 +101,10 @@ export default function ReportScreen() {
       const { data } = await updateDoctorNote(sessionId, noteDraft.trim());
       setSession(data);
       setEditingNote(false);
+    } catch (err) {
+      // e.g. 403 once the patient is reassigned to another doctor, or offline.
+      // The editor stays open with the draft intact so nothing typed is lost.
+      toast.error(getErrorMessage(err, "Couldn't save the note. Try again."));
     } finally {
       setSavingNote(false);
     }

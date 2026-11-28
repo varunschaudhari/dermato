@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TextInput, TouchableOpacity, LayoutAnimation } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { ArrowRight, TrendingUp, ClipboardList, CheckSquare, Square } from 'lucide-react-native';
+import { ArrowRight, TrendingUp, ClipboardList, CheckSquare, Square, ScanFace, History as HistoryIcon } from 'lucide-react-native';
 import { usePatientScope } from '../hooks/usePatientScope';
 import { useSelectedPatient } from '../context/SelectedPatientContext';
 import {
@@ -24,9 +24,10 @@ import { computeTreatmentProgress } from '../utils/treatmentProgress';
 import { SCAN_TYPES, ScanType, comparableTypes, sessionsOfType, isUntagged } from '../utils/scanTypes';
 import ErrorState from '../components/ErrorState';
 import BeforeAfterSlider from '../components/BeforeAfterSlider';
+import ScanPicker from '../components/ScanPicker';
 import EmptyState from '../components/EmptyState';
 
-type RootStackParamList = { Messages: undefined };
+type RootStackParamList = { Messages: undefined; Analyze: undefined; History: undefined };
 
 const SKIN_HISTORY_FIELDS: [keyof SkinHistory, string][] = [
   ['allergies', 'Allergies'],
@@ -144,8 +145,8 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
       : available.find((t) => latestTypes.includes(t)) ?? available[0] ?? null;
   const typed = effectiveType ? sessionsOfType(sessions, effectiveType) : [];
   const anyTagged = sessions.some((s) => !isUntagged(s));
-  const chipLabel = (s: SessionOut) =>
-    new Date(s.captured_at).toLocaleDateString() + (anyTagged && isUntagged(s) ? ' · untagged' : '');
+  // Untagged is only worth flagging once some scans do carry a type.
+  const showUntagged = (s: SessionOut) => anyTagged && isUntagged(s);
 
   // Indices point into `typed`; fall back to defaults if they no longer fit
   // (e.g. the list changed under a pinned selection).
@@ -194,41 +195,35 @@ function BeforeAfterCard({ sessions }: { sessions: SessionOut[] }) {
         </Text>
       ) : (
       <>
-      <Text style={styles.compareChipsLabel}>Before</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
-        {typed.map((s, i) => (
-          <TouchableOpacity
-            key={s.id}
-            style={[styles.compareChip, i === effectiveLeft && styles.compareChipActive]}
-            onPress={() => setLeftIdx(i)}
-            disabled={i === effectiveRight}
-            accessibilityRole="button"
-            accessibilityLabel={`Compare from ${new Date(s.captured_at).toLocaleDateString()}`}
-          >
-            <Text style={[styles.compareChipText, i === effectiveLeft && styles.compareChipTextActive]}>
-              {chipLabel(s)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <View style={styles.pickerRow}>
+        <ScanPicker
+          label="Before"
+          otherLabel="After"
+          sessions={typed}
+          type={effectiveType}
+          selectedIndex={effectiveLeft}
+          otherIndex={effectiveRight}
+          markUntagged={showUntagged}
+          onSelect={setLeftIdx}
+        />
+        <ScanPicker
+          label="After"
+          otherLabel="Before"
+          sessions={typed}
+          type={effectiveType}
+          selectedIndex={effectiveRight}
+          otherIndex={effectiveLeft}
+          markUntagged={showUntagged}
+          onSelect={setRightIdx}
+        />
+      </View>
 
-      <Text style={styles.compareChipsLabel}>After</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.compareChipsRow}>
-        {typed.map((s, i) => (
-          <TouchableOpacity
-            key={s.id}
-            style={[styles.compareChip, i === effectiveRight && styles.compareChipActive]}
-            onPress={() => setRightIdx(i)}
-            disabled={i === effectiveLeft}
-            accessibilityRole="button"
-            accessibilityLabel={`Compare to ${new Date(s.captured_at).toLocaleDateString()}`}
-          >
-            <Text style={[styles.compareChipText, i === effectiveRight && styles.compareChipTextActive]}>
-              {chipLabel(s)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {(showUntagged(left) || showUntagged(right)) && (
+        <View style={styles.untaggedLegend}>
+          <View style={styles.untaggedDot} />
+          <Text style={styles.untaggedLegendText}>Untagged: older scan, shown under every type</Text>
+        </View>
+      )}
 
       <BeforeAfterSlider
         beforeUri={absoluteUrl(left.image_url)}
@@ -473,6 +468,32 @@ export default function ProgressScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* A dermatologist's way into this patient's scanning and scan
+          history -- for them Analyze/History aren't tabs, just root-Stack
+          screens that act on the selected patient (see App.tsx). */}
+      {!isOwn && (
+        <View style={styles.doctorActions}>
+          <TouchableOpacity
+            style={styles.doctorActionPrimary}
+            onPress={() => navigation.navigate('Analyze')}
+            accessibilityRole="button"
+            accessibilityLabel={`New scan for ${patientName || 'this patient'}`}
+          >
+            <ScanFace size={16} color="#fff" />
+            <Text style={styles.doctorActionPrimaryText}>New scan</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.doctorActionSecondary}
+            onPress={() => navigation.navigate('History')}
+            accessibilityRole="button"
+            accessibilityLabel="Scan history"
+          >
+            <HistoryIcon size={16} color={COLORS.teal} />
+            <Text style={styles.doctorActionSecondaryText}>Scan history</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {error && sessions.length === 0 && plans.length === 0 && !skinHistory ? (
         <ErrorState message={error} onRetry={load} />
       ) : (
@@ -604,6 +625,11 @@ const styles = StyleSheet.create({
   outcomeBadgeText: { fontSize: 11, fontWeight: '600' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   messagesLink: { fontSize: 13, fontWeight: '600', color: COLORS.teal },
+  doctorActions: { flexDirection: 'row', gap: 10, marginBottom: 16 },
+  doctorActionPrimary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.teal, borderRadius: 10, paddingVertical: 11 },
+  doctorActionPrimaryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  doctorActionSecondary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: COLORS.teal, borderRadius: 10, paddingVertical: 11 },
+  doctorActionSecondaryText: { color: COLORS.teal, fontWeight: '700', fontSize: 14 },
   cardHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   editLink: { fontSize: 12, fontWeight: '600', color: COLORS.teal },
   fieldLabel: { fontSize: 11, color: COLORS.secondaryText, marginBottom: 4 },
@@ -616,9 +642,13 @@ const styles = StyleSheet.create({
   historyLabel: { fontSize: 10, color: COLORS.mutedGray },
   historyValue: { fontSize: 13, color: '#374151', marginTop: 1 },
   compareImage: { width: '100%', height: 260, borderRadius: 12, backgroundColor: COLORS.divider, marginTop: 10 },
-  compareChipsLabel: { fontSize: 11, color: COLORS.mutedGray, marginTop: 10, marginBottom: 4 },
-  compareChipsRow: { gap: 6 },
+  // A picker per side instead of a chip per scan, so the card stays the same
+  // height however many scans there are.
+  pickerRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
   compareChip: { borderWidth: 1, borderColor: COLORS.divider, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  untaggedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#f59e0b' },
+  untaggedLegend: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 8 },
+  untaggedLegendText: { fontSize: 11, color: COLORS.mutedGray },
   compareChipActive: { backgroundColor: COLORS.teal, borderColor: COLORS.teal },
   compareChipText: { fontSize: 11, color: COLORS.heading, fontWeight: '600' },
   compareChipTextActive: { color: '#fff' },

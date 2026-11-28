@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, RefreshControl, TouchableOpacity } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Users, Clock, MessageCircle, CalendarClock, CheckCircle2 } from 'lucide-react-native';
+import { Users, Clock, MessageCircle, CalendarClock, CheckCircle2, Bell, User as UserIcon } from 'lucide-react-native';
 import { useAuth } from '../context/AuthContext';
 import { useSelectedPatient } from '../context/SelectedPatientContext';
 import { useToast } from '../context/ToastContext';
@@ -11,6 +11,8 @@ import {
   getOverdueRecheck,
   getMessagesInbox,
   getAppointments,
+  getNotifications,
+  getErrorMessage,
   assignDoctor,
   PatientOut,
   OverdueRecheckOut,
@@ -19,8 +21,9 @@ import {
 } from '../api/client';
 import { COLORS } from '../constants';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
 
-type RootStackParamList = { Progress: undefined; Messages: undefined; Appointments: undefined };
+type RootStackParamList = { Progress: undefined; Messages: undefined; Appointments: undefined; Profile: undefined; Notifications: undefined };
 
 function isToday(iso: string): boolean {
   const d = new Date(iso);
@@ -29,7 +32,7 @@ function isToday(iso: string): boolean {
 }
 
 export default function DoctorHomeScreen() {
-  const { fullName } = useAuth();
+  const { fullName, logout } = useAuth();
   const { setSelectedPatient } = useSelectedPatient();
   const toast = useToast();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -40,6 +43,23 @@ export default function DoctorHomeScreen() {
   const [appointments, setAppointments] = useState<AppointmentOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [claimingId, setClaimingId] = useState<number | null>(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [error, setError] = useState('');
+  const [hasLoaded, setHasLoadedState] = useState(false);
+  // Mirrors hasLoaded for load(), which must not re-create on every change.
+  const hasLoadedRef = useRef(false);
+  const setHasLoaded = (value: boolean) => {
+    hasLoadedRef.current = value;
+    setHasLoadedState(value);
+  };
+
+  // Separate from load() on purpose: the bell's dot is a nice-to-have, so a
+  // failure here mustn't take the whole Worklist down with it.
+  const loadNotifications = useCallback(() => {
+    getNotifications()
+      .then(({ data }) => setUnreadNotifications(data.filter((n) => !n.is_read).length))
+      .catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -49,12 +69,26 @@ export default function DoctorHomeScreen() {
       setOverdue(o.data);
       setInbox(m.data);
       setAppointments(a.data);
+      setError('');
+      setHasLoaded(true);
+    } catch (err) {
+      // Before this, a failed load left every list empty and the banner read
+      // "You're all caught up" / "Nothing overdue" -- a false all-clear.
+      const message = getErrorMessage(err, "Couldn't load your worklist.");
+      setError(message);
+      // Data from an earlier load stays on screen; just say the refresh failed.
+      if (hasLoadedRef.current) toast.error(message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [toast]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  const refresh = useCallback(() => {
+    load();
+    loadNotifications();
+  }, [load, loadNotifications]);
+
+  useFocusEffect(refresh);
 
   const unclaimed = useMemo(() => patients.filter((p) => !p.assigned_doctor_id), [patients]);
   const needsReply = useMemo(() => inbox.filter((i) => i.unread_count > 0), [inbox]);
@@ -101,10 +135,38 @@ export default function DoctorHomeScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ padding: 20 }}
-      refreshControl={<RefreshControl refreshing={loading} onRefresh={load} tintColor={COLORS.teal} />}
+      refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} tintColor={COLORS.teal} />}
     >
-      <Text style={styles.title}>{fullName ? `Hi ${fullName.split(' ')[0]}` : 'Worklist'}</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>{fullName ? `Hi ${fullName.split(' ')[0]}` : 'Worklist'}</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Profile')}
+            accessibilityRole="button"
+            accessibilityLabel="Profile"
+          >
+            <UserIcon size={20} color="#374151" strokeWidth={2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => navigation.navigate('Notifications')}
+            accessibilityRole="button"
+            accessibilityLabel={unreadNotifications > 0 ? `Notifications, ${unreadNotifications} unread` : 'Notifications'}
+          >
+            <Bell size={20} color="#374151" strokeWidth={2} />
+            {unreadNotifications > 0 && <View style={styles.bellDot} />}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={logout} accessibilityRole="button" accessibilityLabel="Log out">
+            <Text style={styles.logout}>Log out</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
+      {error && !hasLoaded ? (
+        <ErrorState message={error} onRetry={refresh} />
+      ) : (
+      <>
       <View style={styles.priorityBanner}>
         <Text style={styles.priorityText}>{priorityMessage}</Text>
       </View>
@@ -223,13 +285,20 @@ export default function DoctorHomeScreen() {
           ))
         )}
       </View>
+      </>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f9fafb' },
-  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, marginBottom: 12 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  title: { fontSize: 22, fontWeight: '700', color: COLORS.heading, flexShrink: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  iconButton: { padding: 8 },
+  bellDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: '#dc2626' },
+  logout: { color: '#dc2626', fontSize: 13, fontWeight: '600', marginLeft: 6 },
   priorityBanner: { backgroundColor: COLORS.tealSoft, borderRadius: 12, padding: 14, marginBottom: 16 },
   priorityText: { fontSize: 14, fontWeight: '700', color: COLORS.teal },
   statsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },

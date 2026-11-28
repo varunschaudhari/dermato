@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CheckCircle2, AlertOctagon, Info, X } from 'lucide-react-native';
@@ -52,11 +52,17 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [dismiss]
   );
 
-  const value: ToastContextValue = {
-    success: (message) => push('success', message),
-    error: (message) => push('error', message),
-    info: (message) => push('info', message),
-  };
+  // Memoized so `toast` keeps one identity across renders: a screen can then
+  // list it as a hook dependency without every toast shown (which re-renders
+  // this provider) re-creating that screen's callbacks and re-running effects.
+  const value: ToastContextValue = useMemo(
+    () => ({
+      success: (message) => push('success', message),
+      error: (message) => push('error', message),
+      info: (message) => push('info', message),
+    }),
+    [push]
+  );
 
   return (
     <ToastContext.Provider value={value}>

@@ -19,6 +19,8 @@ import {
 import { COLORS } from '../constants';
 import FormError from '../components/FormError';
 import EmptyState from '../components/EmptyState';
+import ErrorState from '../components/ErrorState';
+import { useToast } from '../context/ToastContext';
 import PatientPickerField from '../components/PatientPickerField';
 
 function nextDays(n: number): { dateStr: string; weekday: string; dayNum: string }[] {
@@ -248,9 +250,13 @@ function BookingForm({ doctors, onBooked }: { doctors: DoctorOption[]; onBooked:
 
 export default function AppointmentsScreen() {
   const { role } = useAuth();
+  const isDoctor = role === 'dermatologist';
+  const toast = useToast();
   const [appointments, setAppointments] = useState<AppointmentOut[]>([]);
   const [doctors, setDoctors] = useState<DoctorOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -258,6 +264,9 @@ export default function AppointmentsScreen() {
       const [a, d] = await Promise.all([getAppointments(), getAvailableDoctors()]);
       setAppointments(a.data);
       setDoctors(d.data);
+      setError('');
+    } catch (err) {
+      setError(getErrorMessage(err, "Couldn't load appointments."));
     } finally {
       setLoading(false);
     }
@@ -265,14 +274,16 @@ export default function AppointmentsScreen() {
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const handleCancel = async (id: number) => {
-    await updateAppointmentStatus(id, 'cancelled');
-    load();
-  };
-
-  const handleComplete = async (id: number) => {
-    await updateAppointmentStatus(id, 'completed');
-    load();
+  const updateStatus = async (id: number, status: 'cancelled' | 'completed') => {
+    setUpdatingId(id);
+    try {
+      await updateAppointmentStatus(id, status);
+      await load();
+    } catch (err) {
+      toast.error(getErrorMessage(err, status === 'cancelled' ? "Couldn't cancel the appointment." : "Couldn't mark it completed."));
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   const sorted = [...appointments].sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
@@ -284,7 +295,9 @@ export default function AppointmentsScreen() {
     return (
       <View key={appt.id} style={styles.apptRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.apptDoctor}>Dr. {appt.doctor_name}</Text>
+          {/* A doctor's list only holds their own appointments, so "Dr. <self>"
+              on every row told them nothing -- they need whose visit it is. */}
+          <Text style={styles.apptDoctor}>{isDoctor ? appt.patient_name : `Dr. ${appt.doctor_name}`}</Text>
           <View style={styles.apptTimeRow}>
             <Clock size={12} color={COLORS.mutedGray} />
             <Text style={styles.apptTime}>
@@ -300,13 +313,23 @@ export default function AppointmentsScreen() {
             <Text style={[styles.statusBadgeText, { color: meta.text }]}>{appt.status}</Text>
           </View>
           {appt.status === 'scheduled' && (
-            <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flexDirection: 'row', gap: 12, opacity: updatingId === appt.id ? 0.4 : 1 }}>
               {role !== 'patient' && (
-                <TouchableOpacity onPress={() => handleComplete(appt.id)} accessibilityRole="button" accessibilityLabel="Mark appointment completed">
+                <TouchableOpacity
+                  onPress={() => updateStatus(appt.id, 'completed')}
+                  disabled={updatingId !== null}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Mark appointment with ${appt.patient_name} completed`}
+                >
                   <Text style={styles.completeLink}>Mark Completed</Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity onPress={() => handleCancel(appt.id)} accessibilityRole="button" accessibilityLabel="Cancel appointment">
+              <TouchableOpacity
+                onPress={() => updateStatus(appt.id, 'cancelled')}
+                disabled={updatingId !== null}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel appointment"
+              >
                 <Text style={styles.cancelLink}>Cancel</Text>
               </TouchableOpacity>
             </View>
@@ -327,6 +350,10 @@ export default function AppointmentsScreen() {
 
       <BookingForm doctors={doctors} onBooked={load} />
 
+      {error && appointments.length === 0 ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : (
+      <>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Upcoming</Text>
         {upcoming.length === 0 ? (
@@ -341,6 +368,8 @@ export default function AppointmentsScreen() {
           <Text style={styles.cardTitle}>Past</Text>
           {past.map(renderAppointment)}
         </View>
+      )}
+      </>
       )}
     </ScrollView>
   );
