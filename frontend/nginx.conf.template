@@ -1,5 +1,11 @@
 server {
     listen 8080;
+
+    # nginx's default is 1 MB per request, which rejected (413) nearly every
+    # real scan: /api/analysis/analyze takes up to three photos (front, left,
+    # right) and the backend allows MAX_IMAGE_SIZE_MB=10 each. The VPS's own
+    # host-level nginx in front of this container needs the same setting.
+    client_max_body_size 40m;
     server_name _;
     root /usr/share/nginx/html;
     index index.html;

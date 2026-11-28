@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, ScrollView, PermissionsAndroid, Platform } from 'react-native';
 import { Lightbulb, Check, Plus } from 'lucide-react-native';
-import { launchCamera, launchImageLibrary, Asset } from 'react-native-image-picker';
+import { launchCamera, launchImageLibrary, Asset, CameraOptions } from 'react-native-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -87,7 +87,11 @@ export default function AnalyzeScreen() {
         return;
       }
     }
-    const result = source === 'camera' ? await launchCamera({ mediaType: 'photo', quality: 0.8 }) : await launchImageLibrary({ mediaType: 'photo', quality: 0.8 });
+    // Downscaled on the phone to the same 1600px the web app's compressImage
+    // uses: a full-resolution camera shot is several MB, slow on mobile data,
+    // and three of them used to overflow the server's upload limit.
+    const pickerOptions: CameraOptions = { mediaType: 'photo', quality: 0.8, maxWidth: 1600, maxHeight: 1600 };
+    const result = source === 'camera' ? await launchCamera(pickerOptions) : await launchImageLibrary(pickerOptions);
     // Both didCancel and errorCode leave `assets` empty -- without checking
     // these first, a denied permission or a camera-less device (e.g. some
     // emulators) looked identical to the button doing nothing at all.

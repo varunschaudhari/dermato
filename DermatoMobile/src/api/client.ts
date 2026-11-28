@@ -82,7 +82,16 @@ export function getErrorMessage(err: any, fallback: string): string {
   if (Array.isArray(detail)) return detail.map((d) => d.msg).filter(Boolean).join('; ') || fallback;
   if (detail && typeof detail === 'object' && typeof detail.message === 'string') return detail.message;
   if (!err?.response && err instanceof Error && err.message) return err.message;
-  return fallback;
+  // The server answered, but not with the backend's JSON error -- usually an
+  // HTML page from a proxy in front of it. Say what kind of failure it was
+  // and include the status code, so a tester's screenshot is diagnosable.
+  const status: number | undefined = err?.response?.status;
+  if (status === 413) return `The photos are too large to upload. Try again with only the front photo. (error 413)`;
+  if (status === 502 || status === 503 || status === 504) {
+    return `The server is busy or restarting. Please try again in a minute. (error ${status})`;
+  }
+  if (status && status >= 500) return `Something went wrong on our side. Please try again. (error ${status})`;
+  return status ? `${fallback} (error ${status})` : fallback;
 }
 
 export const login = (phone: string, password: string) => {

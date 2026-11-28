@@ -386,7 +386,15 @@ export default function AnalyzePage() {
         setError(detail.message)
       } else {
         setIsQualityError(false)
-        setError(detail || 'Analysis failed. Check your connection and try again.')
+        // No JSON detail = the reply came from a proxy (e.g. 413 too large,
+        // 504 timeout), not the backend; the status code makes it diagnosable.
+        const status = err.response?.status
+        setError(
+          (typeof detail === 'string' && detail) ||
+            (status === 413
+              ? 'The photos are too large to upload. Try again with only the front photo. (error 413)'
+              : `Analysis failed. Check your connection and try again.${status ? ` (error ${status})` : ''}`)
+        )
       }
     } finally {
       clearInterval(analysisStageIntervalRef.current)
